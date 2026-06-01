@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(./**)",
+      "Edit(./**)",
+      "Write(./**)",
+      "Bash(npm run lint)",
+      "Bash(npm run test)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run dev)",
+      "Bash(git diff)",
+      "Bash(git status)"
+    ],
+    "ask": [
+      "Bash(npm install:*)",
+      "Bash(npx supabase:*)",
+      "Bash(npx prisma:*)",
+      "Bash(python:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(del /s:*)",
+      "Bash(format:*)",
+      "Bash(git push:*)",
+      "Bash(vercel --prod:*)",
+      "Bash(*--dangerously-skip-permissions*)",
+      "Read(../**/.env*)",
+      "Read(../**/*secret*)"
+    ]
+  }
+}

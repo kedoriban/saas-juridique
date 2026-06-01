@@ -1,0 +1,74 @@
+{
+  "sections": [
+    {
+      "language": "fr",
+      "section_order": 1,
+      "section_slug": "metadata_arret",
+      "section_label": "Métadonnées de l’arrêt",
+      "source_row": null
+    },
+    {
+      "language": "fr",
+      "section_order": 2,
+      "section_slug": "identite_du_demandeur",
+      "section_label": "IDENTITE DU DEMANDEUR",
+      "source_row": 23
+    },
+    {
+      "language": "fr",
+      "section_order": 3,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "source_row": 42
+    },
+    {
+      "language": "fr",
+      "section_order": 4,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "source_row": 75
+    },
+    {
+      "language": "fr",
+      "section_order": 5,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "source_row": 92
+    },
+    {
+      "language": "nl",
+      "section_order": 1,
+      "section_slug": "metadata_arrest",
+      "section_label": "Metadata van het arrest",
+      "source_row": null
+    },
+    {
+      "language": "nl",
+      "section_order": 2,
+      "section_slug": "identiteit_van_de_verzoeker",
+      "section_label": "IDENTITEIT VAN DE VERZOEKER",
+      "source_row": 21
+    },
+    {
+      "language": "nl",
+      "section_order": 3,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "source_row": 40
+    },
+    {
+      "language": "nl",
+      "section_order": 4,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "source_row": 70
+    },
+    {
+      "language": "nl",
+      "section_order": 5,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "source_row": 86
+    }
+  ]
+}

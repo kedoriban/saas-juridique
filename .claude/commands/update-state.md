@@ -1,0 +1,1 @@
+Mets à jour PROJECT_STATE.md avec : ce qui a été fait, les fichiers modifiés, les décisions prises, les risques ouverts, la prochaine action exacte et le prochain prompt recommandé. Ne modifie aucun autre fichier.

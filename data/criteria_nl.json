@@ -1,0 +1,1019 @@
+{
+  "metadata": {
+    "schema_name": "criteria_canonical_schema",
+    "schema_version": "0.1.0",
+    "generated_for": "SaaS juridique CCE/RVV",
+    "important_rules": [
+      "Conserver l’ordre fourni par la cliente.",
+      "Ne pas traduire automatiquement les critères français vers le néerlandais.",
+      "Versionner séparément les critères FR et NL.",
+      "Les nouveaux critères ne s’appliquent qu’aux futurs arrêts sauf retraitement explicite."
+    ],
+    "counts": {
+      "fr": 48,
+      "nl": 48,
+      "total": 96
+    },
+    "language": "nl",
+    "count": 48
+  },
+  "sections": [
+    {
+      "language": "nl",
+      "section_order": 1,
+      "section_slug": "metadata_arrest",
+      "section_label": "Metadata van het arrest",
+      "source_row": null
+    },
+    {
+      "language": "nl",
+      "section_order": 2,
+      "section_slug": "identiteit_van_de_verzoeker",
+      "section_label": "IDENTITEIT VAN DE VERZOEKER",
+      "source_row": 21
+    },
+    {
+      "language": "nl",
+      "section_order": 3,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "source_row": 40
+    },
+    {
+      "language": "nl",
+      "section_order": 4,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "source_row": 70
+    },
+    {
+      "language": "nl",
+      "section_order": 5,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "source_row": 86
+    }
+  ],
+  "criteria": [
+    {
+      "id": "nl_001_datum_van_het_arrest",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 1,
+      "section_slug": "metadata_arrest",
+      "section_label": "Metadata van het arrest",
+      "label_original": "Datum van het arrest",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        4
+      ],
+      "slug": "datum_van_het_arrest",
+      "llm_group": "general",
+      "notes": null
+    },
+    {
+      "id": "nl_002_nummer_van_het_arrest",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 2,
+      "section_slug": "metadata_arrest",
+      "section_label": "Metadata van het arrest",
+      "label_original": "Nummer van het arrest",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        6
+      ],
+      "slug": "nummer_van_het_arrest",
+      "llm_group": "metadata",
+      "notes": null
+    },
+    {
+      "id": "nl_003_rechter",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 3,
+      "section_slug": "metadata_arrest",
+      "section_label": "Metadata van het arrest",
+      "label_original": "Rechter",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        8
+      ],
+      "slug": "rechter",
+      "llm_group": "metadata",
+      "notes": null
+    },
+    {
+      "id": "nl_004_advocaat",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 4,
+      "section_slug": "metadata_arrest",
+      "section_label": "Metadata van het arrest",
+      "label_original": "Advocaat",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        10
+      ],
+      "slug": "advocaat",
+      "llm_group": "metadata",
+      "notes": null
+    },
+    {
+      "id": "nl_005_kamers_fr_cce_of_nl_rvv",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 5,
+      "section_slug": "metadata_arrest",
+      "section_label": "Metadata van het arrest",
+      "label_original": "Kamers FR ( CCE ) of NL ( RvV )",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        12
+      ],
+      "slug": "kamers_fr_cce_of_nl_rvv",
+      "llm_group": "metadata",
+      "notes": null
+    },
+    {
+      "id": "nl_006_datum_van_aankomst_van_de_verzoeker_in_belgie_da",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 6,
+      "section_slug": "metadata_arrest",
+      "section_label": "Metadata van het arrest",
+      "label_original": "Datum van aankomst van de verzoeker in België + datum van indiening van VIB",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        14
+      ],
+      "slug": "datum_van_aankomst_van_de_verzoeker_in_belgie_datum_van_indiening_van_",
+      "llm_group": "general",
+      "notes": null
+    },
+    {
+      "id": "nl_007_duur_van_de_procedure",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 7,
+      "section_slug": "metadata_arrest",
+      "section_label": "Metadata van het arrest",
+      "label_original": "Duur van de procedure",
+      "detail_original": "duur in maanden tussen de datum van indiening van het VIB en de datum van de uitspraak",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        16
+      ],
+      "slug": "duur_van_de_procedure",
+      "llm_group": "procedure",
+      "notes": null
+    },
+    {
+      "id": "nl_008_versnelde_procedure_of_niet",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 8,
+      "section_slug": "metadata_arrest",
+      "section_label": "Metadata van het arrest",
+      "label_original": "Versnelde procedure of niet",
+      "detail_original": "Indien niet vermeld = NEE",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        18
+      ],
+      "slug": "versnelde_procedure_of_niet",
+      "llm_group": "procedure",
+      "notes": null
+    },
+    {
+      "id": "nl_009_nationaliteit_van_de_verzoeker",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 9,
+      "section_slug": "identiteit_van_de_verzoeker",
+      "section_label": "IDENTITEIT VAN DE VERZOEKER",
+      "label_original": "Nationaliteit van de verzoeker",
+      "detail_original": "Vermeld of deze wordt betwist door CGVS en/of RVV",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        23
+      ],
+      "slug": "nationaliteit_van_de_verzoeker",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "nl_010_etnische_afkomst_van_de_verzoeker",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 10,
+      "section_slug": "identiteit_van_de_verzoeker",
+      "section_label": "IDENTITEIT VAN DE VERZOEKER",
+      "label_original": "Etnische afkomst van de verzoeker",
+      "detail_original": "Vermeld de etniciteit van de echtgenoot, moeder en/of echtgenoot, indien bekend",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        25
+      ],
+      "slug": "etnische_afkomst_van_de_verzoeker",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "nl_011_religie_van_de_verzoeker",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 11,
+      "section_slug": "identiteit_van_de_verzoeker",
+      "section_label": "IDENTITEIT VAN DE VERZOEKER",
+      "label_original": "Religie van de verzoeker",
+      "detail_original": "Vermeld de religie van de echtgenoot, indien bekend",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        27
+      ],
+      "slug": "religie_van_de_verzoeker",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "nl_012_prevalentie_van_vgv_in_het_land_van_herkomst",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 12,
+      "section_slug": "identiteit_van_de_verzoeker",
+      "section_label": "IDENTITEIT VAN DE VERZOEKER",
+      "label_original": "Prevalentie van VGV in het land van herkomst",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        29
+      ],
+      "slug": "prevalentie_van_vgv_in_het_land_van_herkomst",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "nl_013_geslacht_van_de_verzoeker",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 13,
+      "section_slug": "identiteit_van_de_verzoeker",
+      "section_label": "IDENTITEIT VAN DE VERZOEKER",
+      "label_original": "Geslacht van de verzoeker",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        31
+      ],
+      "slug": "geslacht_van_de_verzoeker",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "nl_014_1_geboorteplaats_of_regio_van_de_verzoeker_2_woo",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 14,
+      "section_slug": "identiteit_van_de_verzoeker",
+      "section_label": "IDENTITEIT VAN DE VERZOEKER",
+      "label_original": "1. Geboorteplaats of -regio van de verzoeker 2. Woonplaats van de verzoeker",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        33
+      ],
+      "slug": "1_geboorteplaats_of_regio_van_de_verzoeker_2_woonplaats_van_de_verzoek",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "nl_015_verzoeker_nbmv",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 15,
+      "section_slug": "identiteit_van_de_verzoeker",
+      "section_label": "IDENTITEIT VAN DE VERZOEKER",
+      "label_original": "Verzoeker = NBMV?",
+      "detail_original": "Vermeld of er een botonderzoek is uitgevoerd",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        35
+      ],
+      "slug": "verzoeker_nbmv",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "nl_016_documenten_ter_staving_van_de_identiteit_van_de_",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 16,
+      "section_slug": "identiteit_van_de_verzoeker",
+      "section_label": "IDENTITEIT VAN DE VERZOEKER",
+      "label_original": "Documenten ter staving van de identiteit van de verzoeker",
+      "detail_original": "Vermeld of het CGVS/RVV de bewijskracht ervan betwist en zo ja, waarom?",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        37
+      ],
+      "slug": "documenten_ter_staving_van_de_identiteit_van_de_verzoeker",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "nl_017_verzoeker_met_kind_eren",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 17,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "Verzoeker met kind(eren)?",
+      "detail_original": "geslacht/leeftijd/geboorteplaats en huidige woonplaats van elk kind vermelden + aangeven of het kind buiten het huwelijk is geboren",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        42
+      ],
+      "slug": "verzoeker_met_kind_eren",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_018_verzoeker_alleenstaande_moeder",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 18,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "Verzoeker = alleenstaande moeder?",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        44
+      ],
+      "slug": "verzoeker_alleenstaande_moeder",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_019_geboortejaar_of_leeftijd_van_de_verzoeker",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 19,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "Geboortejaar (of leeftijd) van de verzoeker",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        46
+      ],
+      "slug": "geboortejaar_of_leeftijd_van_de_verzoeker",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_020_opleidingsniveau_en_financiele_zelfstandigheid_v",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 20,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "Opleidingsniveau en (financiële) zelfstandigheid van de verzoeker",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        48
+      ],
+      "slug": "opleidingsniveau_en_financiele_zelfstandigheid_van_de_verzoeker",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_021_vgv_of_vrees_voor_vgv",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 21,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "VGV of vrees voor VGV?",
+      "detail_original": "Geef het type VGV aan (van 1 tot 4)",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        50
+      ],
+      "slug": "vgv_of_vrees_voor_vgv",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_022_herbesnijdenis_of_angst_voor_herbesnijdenis",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 22,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "Herbesnijdenis of angst voor herbesnijdenis?",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        52
+      ],
+      "slug": "herbesnijdenis_of_angst_voor_herbesnijdenis",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_023_gedwongen_huwelijk_en_of_vroegtijdig_huwelijk_ge",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 23,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "Gedwongen huwelijk en/of vroegtijdig huwelijk: gevreesd of daadwerkelijk?",
+      "detail_original": "Geef aan of het om leviraatshuwelijk of sororaatshuwelijk gaat, of om polygamie. Geef de leeftijd van de gedwongen echtgenoot aan, indien bekend",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        54
+      ],
+      "slug": "gedwongen_huwelijk_en_of_vroegtijdig_huwelijk_gevreesd_of_daadwerkelij",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_024_bijzondere_kwetsbaarheden_van_de_verzoeker",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 24,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "Bijzondere kwetsbaarheden van de verzoeker",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        56
+      ],
+      "slug": "bijzondere_kwetsbaarheden_van_de_verzoeker",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_025_geweld_ondergaan_tijdens_de_migratieroute",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 25,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "Geweld ondergaan tijdens de migratieroute?",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        58
+      ],
+      "slug": "geweld_ondergaan_tijdens_de_migratieroute",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_026_documenten_ingediend_ter_ondersteuning_van_de_aa",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 26,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "DOCUMENTEN INGEDIEND ter ondersteuning van de aanvraag:",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        61
+      ],
+      "slug": "documenten_ingediend_ter_ondersteuning_van_de_aanvraag",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_027_ingediend_medisch_rapport_de_aard_van_de_klinisc",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 27,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "Ingediend medisch rapport (de aard van de klinische observaties en voorgeschreven behandelingen vermeld)",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        63
+      ],
+      "slug": "ingediend_medisch_rapport_de_aard_van_de_klinische_observaties_en_voor",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_028_ingediend_psychologisch_psychiatrisch_rapport_kl",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 28,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "Ingediend psychologisch/psychiatrisch rapport: klinische bevindingen gespecifieerd",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        65
+      ],
+      "slug": "ingediend_psychologisch_psychiatrisch_rapport_klinische_bevindingen_ge",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_029_toegekende_bijzondere_procedurele_behoeften_art_",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 29,
+      "section_slug": "profiel_van_de_verzoeker",
+      "section_label": "PROFIEL VAN DE VERZOEKER",
+      "label_original": "Toegekende bijzondere procedurele behoeften (art. 22, §1/1 Opvangwet)",
+      "detail_original": "specificeer welke",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        67
+      ],
+      "slug": "toegekende_bijzondere_procedurele_behoeften_art_22_1_1_opvangwet",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "nl_030_latere_aanvraag_toepassing_van_art_51_8",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 30,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "label_original": "Latere aanvraag (toepassing van art. 51,8)?",
+      "detail_original": "specificeer het nieuwe element dat de ontvankelijkheid van de nieuwe aanvraag rechtvaardigt",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        72
+      ],
+      "slug": "latere_aanvraag_toepassing_van_art_51_8",
+      "llm_group": "procedure",
+      "notes": null
+    },
+    {
+      "id": "nl_031_veilig_land_van_herkomst_veilig_derde_land",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 31,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "label_original": "Veilig land van herkomst/veilig derde land",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        74
+      ],
+      "slug": "veilig_land_van_herkomst_veilig_derde_land",
+      "llm_group": "procedure",
+      "notes": null
+    },
+    {
+      "id": "nl_032_door_de_verzoeker_aangevoerde_vervolging",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 32,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "label_original": "DOOR DE VERZOEKER AANGEVOERDE VERVOLGING",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        77
+      ],
+      "slug": "door_de_verzoeker_aangevoerde_vervolging",
+      "llm_group": "procedure",
+      "notes": null
+    },
+    {
+      "id": "nl_033_vervolging_op_grond_van_geslacht_waarop_het_vib_",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 33,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "label_original": "Vervolging op grond van geslacht waarop het VIB is gebaseerd: besnijdenis/gedwongen huwelijk/seksueel geweld/huiselijk geweld/slavernij/eermoord/prostitutie/mensenhandel/seksuele geaardheid/gedwongen abortus en sterilisatie/verzet tegen besnijdenis",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        79
+      ],
+      "slug": "vervolging_op_grond_van_geslacht_waarop_het_vib_is_gebaseerd_besnijden",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "nl_034_vervolging_op_grond_van_politieke_overtuiging",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 34,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "label_original": "Vervolging op grond van politieke overtuiging",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        81
+      ],
+      "slug": "vervolging_op_grond_van_politieke_overtuiging",
+      "llm_group": "procedure",
+      "notes": null
+    },
+    {
+      "id": "nl_035_het_behoren_tot_een_sociale_groep_met_aangeboren",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 35,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "label_original": "Het behoren tot een sociale groep met aangeboren kenmerken en een eigen identiteit",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        83
+      ],
+      "slug": "het_behoren_tot_een_sociale_groep_met_aangeboren_kenmerken_en_een_eige",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "nl_036_eerdere_beslissing_tot_weigering_of_toekenning_v",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 36,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "Eerdere beslissing tot weigering of toekenning van de vluchtelingenstatus aan de verzoeker door een andere lidstaat",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        88
+      ],
+      "slug": "eerdere_beslissing_tot_weigering_of_toekenning_van_de_vluchtelingensta",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "nl_037_geloofwaardigheid_van_het_verhaal_voordeel_van_d",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 37,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "Geloofwaardigheid van het verhaal/voordeel van de twijfel ten gunste van de verzoeker Art. 48,6 &4",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        90
+      ],
+      "slug": "geloofwaardigheid_van_het_verhaal_voordeel_van_de_twijfel_ten_gunste_v",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "nl_038_toepassing_van_art_48_7_vervolging_in_het_verled",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 38,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "Toepassing van art. 48/7 (vervolging in het verleden als ernstige aanwijzing voor toekomstige vervolging)",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        92
+      ],
+      "slug": "toepassing_van_art_48_7_vervolging_in_het_verleden_als_ernstige_aanwij",
+      "llm_group": "persecution_claims",
+      "notes": null
+    },
+    {
+      "id": "nl_039_permanent_karakter_van_de_gevolgen_gezien_de_bij",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 39,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "Permanent karakter van de gevolgen, gezien de bijzonder gruwelijke omstandigheden, waardoor terugkeer naar het land onmogelijk is",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        94
+      ],
+      "slug": "permanent_karakter_van_de_gevolgen_gezien_de_bijzonder_gruwelijke_omst",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "nl_040_1_wie_is_de_vervolger_2_wie_is_zijn_de_bescherme",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 40,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "1. Wie is de vervolger? 2. Wie is/zijn de beschermer(s)?",
+      "detail_original": "toepassing van art. 48/5 &1 en &2",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        96
+      ],
+      "slug": "1_wie_is_de_vervolger_2_wie_is_zijn_de_beschermer_s",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "nl_041_bestaat_er_effectieve_nationale_bescherming_en_o",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 41,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "Bestaat er effectieve nationale bescherming en/of een mogelijkheid tot interne vlucht (art. 48,5 &3)?",
+      "detail_original": "Toepassing van art. 48,5 &3",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        98
+      ],
+      "slug": "bestaat_er_effectieve_nationale_bescherming_en_of_een_mogelijkheid_tot",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "nl_042_motivering_van_het_cgvs",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 42,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "Motivering van het CGVS",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        100
+      ],
+      "slug": "motivering_van_het_cgvs",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "nl_043_motivering_van_de_rvv",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 43,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "Motivering van de RVV",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        102
+      ],
+      "slug": "motivering_van_de_rvv",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "nl_044_gaat_het_om_een_principiele_uitspraak_en_of_een_",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 44,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "Gaat het om een principiële uitspraak en/of een evolutie in de rechtspraak?",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        105
+      ],
+      "slug": "gaat_het_om_een_principiele_uitspraak_en_of_een_evolutie_in_de_rechtsp",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "nl_045_link_naar_het_arrest",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 45,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "Link naar het arrest",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        107
+      ],
+      "slug": "link_naar_het_arrest",
+      "llm_group": "metadata",
+      "notes": null
+    },
+    {
+      "id": "nl_046_samenvatting_van_het_arrest_in_trefwoorden",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 46,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "Samenvatting van het arrest in trefwoorden?",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        109
+      ],
+      "slug": "samenvatting_van_het_arrest_in_trefwoorden",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "nl_047_geciteerde_rapporten_over_het_land_van_herkomst",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 47,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "Geciteerde rapporten over het land van herkomst",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        111
+      ],
+      "slug": "geciteerde_rapporten_over_het_land_van_herkomst",
+      "llm_group": "evidence_documents",
+      "notes": null
+    },
+    {
+      "id": "nl_048_rechtspraak_leer_aangehaald_in_het_arrest",
+      "language": "nl",
+      "version": "client_excel_v1",
+      "order_index": 48,
+      "section_slug": "beslissing",
+      "section_label": "BESLISSING",
+      "label_original": "Rechtspraak/leer aangehaald in het arrest",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse nl_Relu Lb(2).xlsx",
+      "source_sheet": "Blad 1",
+      "source_rows": [
+        113
+      ],
+      "slug": "rechtspraak_leer_aangehaald_in_het_arrest",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    }
+  ]
+}

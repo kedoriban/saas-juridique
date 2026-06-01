@@ -1,0 +1,1022 @@
+{
+  "metadata": {
+    "schema_name": "criteria_canonical_schema",
+    "schema_version": "0.1.0",
+    "generated_for": "SaaS juridique CCE/RVV",
+    "important_rules": [
+      "Conserver l’ordre fourni par la cliente.",
+      "Ne pas traduire automatiquement les critères français vers le néerlandais.",
+      "Versionner séparément les critères FR et NL.",
+      "Les nouveaux critères ne s’appliquent qu’aux futurs arrêts sauf retraitement explicite."
+    ],
+    "counts": {
+      "fr": 48,
+      "nl": 48,
+      "total": 96
+    },
+    "language": "fr",
+    "count": 48
+  },
+  "sections": [
+    {
+      "language": "fr",
+      "section_order": 1,
+      "section_slug": "metadata_arret",
+      "section_label": "Métadonnées de l’arrêt",
+      "source_row": null
+    },
+    {
+      "language": "fr",
+      "section_order": 2,
+      "section_slug": "identite_du_demandeur",
+      "section_label": "IDENTITE DU DEMANDEUR",
+      "source_row": 23
+    },
+    {
+      "language": "fr",
+      "section_order": 3,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "source_row": 42
+    },
+    {
+      "language": "fr",
+      "section_order": 4,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "source_row": 75
+    },
+    {
+      "language": "fr",
+      "section_order": 5,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "source_row": 92
+    }
+  ],
+  "criteria": [
+    {
+      "id": "fr_001_date_de_l_arret",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 1,
+      "section_slug": "metadata_arret",
+      "section_label": "Métadonnées de l’arrêt",
+      "label_original": "Date de l'arrêt",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        6
+      ],
+      "slug": "date_de_l_arret",
+      "llm_group": "metadata",
+      "notes": null
+    },
+    {
+      "id": "fr_002_numero_de_l_arret",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 2,
+      "section_slug": "metadata_arret",
+      "section_label": "Métadonnées de l’arrêt",
+      "label_original": "Numéro de l'arrêt",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        8
+      ],
+      "slug": "numero_de_l_arret",
+      "llm_group": "metadata",
+      "notes": null
+    },
+    {
+      "id": "fr_003_juge",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 3,
+      "section_slug": "metadata_arret",
+      "section_label": "Métadonnées de l’arrêt",
+      "label_original": "Juge",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        10
+      ],
+      "slug": "juge",
+      "llm_group": "metadata",
+      "notes": null
+    },
+    {
+      "id": "fr_004_avocat_du_demandeur",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 4,
+      "section_slug": "metadata_arret",
+      "section_label": "Métadonnées de l’arrêt",
+      "label_original": "Avocat du demandeur",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        12
+      ],
+      "slug": "avocat_du_demandeur",
+      "llm_group": "metadata",
+      "notes": null
+    },
+    {
+      "id": "fr_005_chambres_fr_cce_ou_nl_cvv",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 5,
+      "section_slug": "metadata_arret",
+      "section_label": "Métadonnées de l’arrêt",
+      "label_original": "Chambres FR ( CCE ) ou NL ( CvV )",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        14
+      ],
+      "slug": "chambres_fr_cce_ou_nl_cvv",
+      "llm_group": "metadata",
+      "notes": null
+    },
+    {
+      "id": "fr_006_date_d_arrivee_en_belgique_du_demandeur_date_d_i",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 6,
+      "section_slug": "metadata_arret",
+      "section_label": "Métadonnées de l’arrêt",
+      "label_original": "Date d'arrivée en Belgique du demandeur + date d'introduction de la DPI",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        16
+      ],
+      "slug": "date_d_arrivee_en_belgique_du_demandeur_date_d_introduction_de_la_dpi",
+      "llm_group": "metadata",
+      "notes": null
+    },
+    {
+      "id": "fr_007_duree_procedure",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 7,
+      "section_slug": "metadata_arret",
+      "section_label": "Métadonnées de l’arrêt",
+      "label_original": "Durée procédure",
+      "detail_original": "durée en mois entre date d'introduction de la DPI jusque date de l'arrêt",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        18
+      ],
+      "slug": "duree_procedure",
+      "llm_group": "procedure",
+      "notes": null
+    },
+    {
+      "id": "fr_008_procedure_acceleree_ou_non",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 8,
+      "section_slug": "metadata_arret",
+      "section_label": "Métadonnées de l’arrêt",
+      "label_original": "Procédure accelérée ou non",
+      "detail_original": "Si non mentionné = NON",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        20
+      ],
+      "slug": "procedure_acceleree_ou_non",
+      "llm_group": "procedure",
+      "notes": null
+    },
+    {
+      "id": "fr_009_nationalite_du_demandeur",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 9,
+      "section_slug": "identite_du_demandeur",
+      "section_label": "IDENTITE DU DEMANDEUR",
+      "label_original": "Nationalité du Demandeur",
+      "detail_original": "Préciser si elle est contestée par CGRA et/ou CCE",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        25
+      ],
+      "slug": "nationalite_du_demandeur",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "fr_010_ethnie_du_demandeur",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 10,
+      "section_slug": "identite_du_demandeur",
+      "section_label": "IDENTITE DU DEMANDEUR",
+      "label_original": "Ethnie du demandeur",
+      "detail_original": "Préciser éthnie du conjoint, de la mère et/ou du mari, si connue",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        27
+      ],
+      "slug": "ethnie_du_demandeur",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "fr_011_religion_de_demandeur",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 11,
+      "section_slug": "identite_du_demandeur",
+      "section_label": "IDENTITE DU DEMANDEUR",
+      "label_original": "Religion de demandeur",
+      "detail_original": "Préciser religion du conjoint, si connue",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        29
+      ],
+      "slug": "religion_de_demandeur",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "fr_012_taux_de_prevalence_des_mgf_dans_le_pays_d_origin",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 12,
+      "section_slug": "identite_du_demandeur",
+      "section_label": "IDENTITE DU DEMANDEUR",
+      "label_original": "Taux de prévalence des MGF dans le pays d'origine et/ou dans ethnie du demandeur",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        31
+      ],
+      "slug": "taux_de_prevalence_des_mgf_dans_le_pays_d_origine_et_ou_dans_ethnie_du",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "fr_013_sexe_requerant_e",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 13,
+      "section_slug": "identite_du_demandeur",
+      "section_label": "IDENTITE DU DEMANDEUR",
+      "label_original": "Sexe requérant(e)",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        33
+      ],
+      "slug": "sexe_requerant_e",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "fr_014_1_region_ou_ville_de_de_naissance_du_demandeur_2",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 14,
+      "section_slug": "identite_du_demandeur",
+      "section_label": "IDENTITE DU DEMANDEUR",
+      "label_original": "1. Région ou ville de de naissance du demandeur 2. Lieu de vie du demandeur",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        35
+      ],
+      "slug": "1_region_ou_ville_de_de_naissance_du_demandeur_2_lieu_de_vie_du_demand",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "fr_015_demandeur_mena",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 15,
+      "section_slug": "identite_du_demandeur",
+      "section_label": "IDENTITE DU DEMANDEUR",
+      "label_original": "Demandeur = MENA?",
+      "detail_original": "Préciser si réalisation d'un test d'osseux",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        37
+      ],
+      "slug": "demandeur_mena",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "fr_016_documents_attestant_de_l_identite_du_demandeur_d",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 16,
+      "section_slug": "identite_du_demandeur",
+      "section_label": "IDENTITE DU DEMANDEUR",
+      "label_original": "Documents attestant de l'identité du demandeur déposés",
+      "detail_original": "Préciser si CGRA/CCE conteste leur force probante et le cas échéant pourquoi?",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        39
+      ],
+      "slug": "documents_attestant_de_l_identite_du_demandeur_deposes",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "fr_017_demandeur_avec_enfant_s",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 17,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "Demandeur avec enfant(s)?",
+      "detail_original": "détailler sexe/âge/lieu de naissance et lieu de résidence actuel de chaque enfant + préciser si enfant né hors mariage",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        44
+      ],
+      "slug": "demandeur_avec_enfant_s",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_018_demandeur_une_mere_celibataire",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 18,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "Demandeur = une mère célibataire?",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        46
+      ],
+      "slug": "demandeur_une_mere_celibataire",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_019_annee_de_naissance_ou_age_du_demandeur",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 19,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "Année de naissance ( ou âge ) du demandeur",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        48
+      ],
+      "slug": "annee_de_naissance_ou_age_du_demandeur",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_020_niveau_d_etudes_et_autonomie_financiere_du_deman",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 20,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "Niveau d'études et autonomie ( financière ) du demandeur",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        50
+      ],
+      "slug": "niveau_d_etudes_et_autonomie_financiere_du_demandeur",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_021_mgf_ou_crainte_de_mgf",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 21,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "MGF ou crainte de MGF?",
+      "detail_original": "préciser le type de MGF ( de 1 à 4 )",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        52
+      ],
+      "slug": "mgf_ou_crainte_de_mgf",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_022_reexcision_ou_crainte_de_reexcision",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 22,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "Réexcision ou crainte de reexcision?",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        54
+      ],
+      "slug": "reexcision_ou_crainte_de_reexcision",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_023_desinfibulation_subie_ou_prevue",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 23,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "Désinfibulation subie ou prévue?",
+      "detail_original": "préciser les circonstances",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        56
+      ],
+      "slug": "desinfibulation_subie_ou_prevue",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_024_mariage_force_et_ou_mariage_precoce_craint_ou_ef",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 24,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "Mariage forcé et/ou mariage précoce : craint ou effectif?",
+      "detail_original": "Préciser si lévirat ou sororat, si Polygamie. Préciser âge du mari forcé, si connu",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        58
+      ],
+      "slug": "mariage_force_et_ou_mariage_precoce_craint_ou_effectif",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_025_vulnerabilites_particulieres_reconnues_au_demand",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 25,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "Vulnérabilités particulières reconnues au demandeur demandeur a t-il subi des violences subies pendant le parcours migratoire? le demandeur a été enrôlé comme enfant-soldat",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        60,
+        62,
+        64
+      ],
+      "slug": "vulnerabilites_particulieres_reconnues_au_demandeur_demandeur_a_t_il_s",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_026_documents_deposes_a_l_appui_de_la_demande",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 26,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "DOCUMENTS DEPOSES à l'appui de la demande:",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        66
+      ],
+      "slug": "documents_deposes_a_l_appui_de_la_demande",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_027_rapport_medical_depose_preciser_nature_des_obser",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 27,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "Rapport médical déposé ( préciser nature des observations cliniques et traitements prescrits )",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        68
+      ],
+      "slug": "rapport_medical_depose_preciser_nature_des_observations_cliniques_et_t",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_028_rapport_psychologique_psychiatrique_depose_preci",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 28,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "Rapport psychologique/psychiatrique déposé: préciser observations cliniques",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        70
+      ],
+      "slug": "rapport_psychologique_psychiatrique_depose_preciser_observations_clini",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_029_besoins_proceduraux_speciaux_accordes_art_22_1_1",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 29,
+      "section_slug": "profil_du_demandeur",
+      "section_label": "PROFIL DU DEMANDEUR",
+      "label_original": "Besoins procéduraux spéciaux accordés Art. 22, §1/1 Loi accueil)",
+      "detail_original": "préciser lesquels",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        72
+      ],
+      "slug": "besoins_proceduraux_speciaux_accordes_art_22_1_1_loi_accueil",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_030_demande_ulterieure_application_de_l_art_51_8",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 30,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "label_original": "Demande ultérieure ( Application de l'art. 51,8 )?",
+      "detail_original": "préciser l'élement nouveau fondant la recevabilité de la demande nouvelle",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        77
+      ],
+      "slug": "demande_ulterieure_application_de_l_art_51_8",
+      "llm_group": "procedure",
+      "notes": null
+    },
+    {
+      "id": "fr_031_pays_d_origine_sur_pays_tiers_sur",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 31,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "label_original": "Pays d'origine sûr/Pays tiers sûr",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        79
+      ],
+      "slug": "pays_d_origine_sur_pays_tiers_sur",
+      "llm_group": "procedure",
+      "notes": null
+    },
+    {
+      "id": "fr_032_persecutions_invoquees_par_le_demandeur",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 32,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "label_original": "PERSECUTIONS INVOQUEES PAR LE DEMANDEUR",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        82
+      ],
+      "slug": "persecutions_invoquees_par_le_demandeur",
+      "llm_group": "procedure",
+      "notes": null
+    },
+    {
+      "id": "fr_033_persecutions_de_genre_sur_lesquelles_la_dpi_est_",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 33,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "label_original": "Persécutions de genre sur lesquelles la DPI est fondée: excision/mariage forcé/violences sexuelles/violences domestiques/ esclavage/crimes d'honneur/prostitution/ traite des êtres humains/orientation sexuelle/avortement et stérilisation forcés/opposition à excision",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        84,
+        85
+      ],
+      "slug": "persecutions_de_genre_sur_lesquelles_la_dpi_est_fondee_excision_mariag",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_034_persecutions_liees_a_des_opinions_politiques_ou_",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 34,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "label_original": "Persécutions liées à des opinions politiques ou à opposition aux MGF",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        87
+      ],
+      "slug": "persecutions_liees_a_des_opinions_politiques_ou_a_opposition_aux_mgf",
+      "llm_group": "profile_vulnerability",
+      "notes": null
+    },
+    {
+      "id": "fr_035_appartenance_a_un_groupe_social_partageant_des_c",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 35,
+      "section_slug": "procedure",
+      "section_label": "PROCEDURE",
+      "label_original": "Appartenance à un groupe social partageant des caractéristiques innées et ayant une identité propre",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        89
+      ],
+      "slug": "appartenance_a_un_groupe_social_partageant_des_caracteristiques_innees",
+      "llm_group": "procedure",
+      "notes": null
+    },
+    {
+      "id": "fr_036_decision_de_refus_ou_d_octroi_de_statut_de_refug",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 36,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "Décision de refus ou d'octroi de statut de réfugié antérieur délivrée au demandeur par un autre état membre",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        94
+      ],
+      "slug": "decision_de_refus_ou_d_octroi_de_statut_de_refugie_anterieur_delivree_",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "fr_037_credibilite_du_recit_benefice_du_doute_profitant",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 37,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "Crédibilité du récit/ bénéfice du doute profitant au demandeur Art. 48,6 &4",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        96
+      ],
+      "slug": "credibilite_du_recit_benefice_du_doute_profitant_au_demandeur_art_48_6",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "fr_038_application_de_l_art_48_7_persecution_passee_com",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 38,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "Application de l'Art. 48/7 (persécution passée comme indice sérieux de persécution future)",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        98
+      ],
+      "slug": "application_de_l_art_48_7_persecution_passee_comme_indice_serieux_de_p",
+      "llm_group": "persecution_claims",
+      "notes": null
+    },
+    {
+      "id": "fr_039_caractere_permanent_des_sequelles_eu_egard_aux_c",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 39,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "Caractère permanent des séquelles, eu égard aux circonstances particulièrement atroce, rendant le retour au pays impossible",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        100
+      ],
+      "slug": "caractere_permanent_des_sequelles_eu_egard_aux_circonstances_particuli",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "fr_040_1_quel_est_l_agent_de_persecution_2_quel_est_l_a",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 40,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "1. Quel est l'agent de persécution 2. Quel est l'agent(s) de protection",
+      "detail_original": "application de l'art. 48/5 &1 et &2",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        102
+      ],
+      "slug": "1_quel_est_l_agent_de_persecution_2_quel_est_l_agent_s_de_protection",
+      "llm_group": "persecution_claims",
+      "notes": null
+    },
+    {
+      "id": "fr_041_existe_t_il_une_protection_nationale_effective_e",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 41,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "Existe-t'il une protection nationale effective et/ou une possibilité de fuite interne ( art. 48,5 &3 )",
+      "detail_original": "Application de l' art. 48,5 &3",
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        104
+      ],
+      "slug": "existe_t_il_une_protection_nationale_effective_et_ou_une_possibilite_d",
+      "llm_group": "identity",
+      "notes": null
+    },
+    {
+      "id": "fr_042_motivation_du_cgra",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 42,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "Motivation du CGRA",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        106
+      ],
+      "slug": "motivation_du_cgra",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "fr_043_motivation_du_cce",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 43,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "Motivation du CCE",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        108
+      ],
+      "slug": "motivation_du_cce",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "fr_044_s_agit_il_d_un_arret_de_principe_et_ou_d_une_evo",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 44,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "S'agit-il d'un arrêt de principe et/ou d'une évolution de la jurisprudence ou d'une confirmation de la jusisprudence actuelle?",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        111
+      ],
+      "slug": "s_agit_il_d_un_arret_de_principe_et_ou_d_une_evolution_de_la_jurisprud",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "fr_045_lien_vers_l_arret",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 45,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "Lien vers l'arrêt",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        113
+      ],
+      "slug": "lien_vers_l_arret",
+      "llm_group": "metadata",
+      "notes": null
+    },
+    {
+      "id": "fr_046_resume_de_l_arret_en_mots_cles_resume_succint_en",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 46,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "Résumé de l'arrêt en mots clés + résumé succint en X caractères",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        115
+      ],
+      "slug": "resume_de_l_arret_en_mots_cles_resume_succint_en_x_caracteres",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    },
+    {
+      "id": "fr_047_rapports_sur_le_pays_d_origine_cites",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 47,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "Rapports sur le Pays d'origine cités",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        117
+      ],
+      "slug": "rapports_sur_le_pays_d_origine_cites",
+      "llm_group": "evidence_documents",
+      "notes": null
+    },
+    {
+      "id": "fr_048_jurisprudence_doctrine_citees_dans_l_arret",
+      "language": "fr",
+      "version": "client_excel_v1",
+      "order_index": 48,
+      "section_slug": "decision",
+      "section_label": "DECISION",
+      "label_original": "Jurisprudence/Doctrine citées dans l'arrêt",
+      "detail_original": null,
+      "expected_value_type": "text_or_structured_json",
+      "active": true,
+      "source_file": "Critères analyse(2).xlsx",
+      "source_sheet": "Feuil1",
+      "source_rows": [
+        119
+      ],
+      "slug": "jurisprudence_doctrine_citees_dans_l_arret",
+      "llm_group": "decision_reasoning",
+      "notes": null
+    }
+  ]
+}
