@@ -47,6 +47,57 @@ export interface Criterion {
   updated_at: string;
 }
 
+export interface Arret {
+  id: string;
+  numero: string;
+  date_arret: string;
+  langue: "fr" | "nl";
+  chambre: string | null;
+  matiere: string | null;
+  pays_origine: string | null;
+  pdf_url: string | null;
+  resume: string | null;
+  statut_traitement: "en_attente" | "en_cours" | "termine" | "erreur";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArretCriteriaValue {
+  id: string;
+  arret_id: string;
+  criterion_id: string;
+  value_text: string | null;
+  value_boolean: boolean | null;
+  confidence: number | null;
+  model_run_id: string | null;
+  validated_by: string | null;
+  validated_at: string | null;
+  created_at: string;
+}
+
+export interface ProcessingJob {
+  id: string;
+  arret_id: string;
+  job_type: "scrape" | "extract_text" | "analyze";
+  status: "pending" | "running" | "done" | "error";
+  started_at: string | null;
+  finished_at: string | null;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface ModelRun {
+  id: string;
+  arret_id: string;
+  model_name: string;
+  model_version: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  duration_ms: number | null;
+  status: "done" | "error";
+  created_at: string;
+}
+
 export interface CriterionAuditLog {
   id: string;
   criterion_id: string;
