@@ -13,7 +13,7 @@ const supabase = createClient(
 function pdfUrl(numeroRaw, langue) {
   const digits = numeroRaw.replace(/\D/g, "").padStart(6, "0");
   const ext = langue === "nl" ? "an" : "fr";
-  return `https://www.rvv-cce.be/sites/default/files/arr/a${digits}.${ext}.pdf`;
+  return `https://www.rvv-cce.be/sites/default/files/arr/a${digits}.${ext}_.pdf`;
 }
 
 const ARRETS = [

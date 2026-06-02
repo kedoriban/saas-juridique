@@ -142,7 +142,7 @@
       "order_index": 5,
       "section_slug": "metadata_arret",
       "section_label": "Métadonnées de l’arrêt",
-      "label_original": "Chambres FR ( CCE ) ou NL ( CvV )",
+      "label_original": "Chambres FR ( CCE ) ou NL ( RvV )",
       "detail_original": null,
       "expected_value_type": "text_or_structured_json",
       "active": true,
@@ -694,7 +694,7 @@
         82
       ],
       "slug": "persecutions_invoquees_par_le_demandeur",
-      "llm_group": "procedure",
+      "llm_group": "persecution_claims",
       "notes": null
     },
     {
@@ -715,7 +715,7 @@
         85
       ],
       "slug": "persecutions_de_genre_sur_lesquelles_la_dpi_est_fondee_excision_mariag",
-      "llm_group": "profile_vulnerability",
+      "llm_group": "persecution_claims",
       "notes": null
     },
     {
@@ -735,7 +735,7 @@
         87
       ],
       "slug": "persecutions_liees_a_des_opinions_politiques_ou_a_opposition_aux_mgf",
-      "llm_group": "profile_vulnerability",
+      "llm_group": "persecution_claims",
       "notes": null
     },
     {
@@ -755,7 +755,7 @@
         89
       ],
       "slug": "appartenance_a_un_groupe_social_partageant_des_caracteristiques_innees",
-      "llm_group": "procedure",
+      "llm_group": "persecution_claims",
       "notes": null
     },
     {
@@ -875,7 +875,7 @@
         104
       ],
       "slug": "existe_t_il_une_protection_nationale_effective_et_ou_une_possibilite_d",
-      "llm_group": "identity",
+      "llm_group": "decision_reasoning",
       "notes": null
     },
     {

@@ -7,6 +7,12 @@ export default async function ParametresPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user?.id ?? "")
+    .single();
+
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto">
       <h1 className="text-xl font-bold text-gray-900">Paramètres</h1>
@@ -17,7 +23,7 @@ export default async function ParametresPage() {
             Compte
           </p>
           <p className="text-sm font-medium text-gray-800">{user?.email}</p>
-          <p className="text-xs text-gray-400 mt-0.5">Rôle : avocat</p>
+          <p className="text-xs text-gray-400 mt-0.5">Rôle : {profile?.role ?? "—"}</p>
         </div>
 
         <div className="px-4 py-4">
@@ -25,20 +31,14 @@ export default async function ParametresPage() {
             Administration
           </p>
           <div className="space-y-2">
-            <a
-              href="/parametres/utilisateurs"
-              className="flex items-center justify-between text-sm text-gray-700 hover:text-blue-600"
-            >
+            <div className="flex items-center justify-between text-sm text-gray-400">
               <span>Gestion des utilisateurs</span>
-              <span className="text-gray-300">›</span>
-            </a>
-            <a
-              href="/parametres/organisation"
-              className="flex items-center justify-between text-sm text-gray-700 hover:text-blue-600"
-            >
+              <span className="text-xs text-gray-300">bientôt</span>
+            </div>
+            <div className="flex items-center justify-between text-sm text-gray-400">
               <span>Organisation</span>
-              <span className="text-gray-300">›</span>
-            </a>
+              <span className="text-xs text-gray-300">bientôt</span>
+            </div>
           </div>
         </div>
 

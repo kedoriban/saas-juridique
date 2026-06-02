@@ -1,10 +1,9 @@
 import Link from "next/link";
 import type { Arret } from "@/lib/types";
 
-const LANGUE_LABEL: Record<string, string> = { fr: "FR", nl: "NL" };
 const LANGUE_COLOR: Record<string, string> = {
-  fr: "bg-blue-100 text-blue-700",
-  nl: "bg-orange-100 text-orange-700",
+  fr: "bg-blue-50 text-blue-700 ring-1 ring-blue-200",
+  nl: "bg-orange-50 text-orange-700 ring-1 ring-orange-200",
 };
 
 const STATUT_LABEL: Record<string, string> = {
@@ -13,11 +12,11 @@ const STATUT_LABEL: Record<string, string> = {
   termine: "Terminé",
   erreur: "Erreur",
 };
-const STATUT_COLOR: Record<string, string> = {
-  en_attente: "bg-gray-100 text-gray-500",
-  en_cours: "bg-yellow-100 text-yellow-700",
-  termine: "bg-green-100 text-green-700",
-  erreur: "bg-red-100 text-red-600",
+const STATUT_DOT: Record<string, string> = {
+  en_attente: "bg-gray-300",
+  en_cours: "bg-yellow-400",
+  termine: "bg-green-400",
+  erreur: "bg-red-400",
 };
 
 function formatDate(iso: string) {
@@ -30,47 +29,58 @@ function formatDate(iso: string) {
 
 export default function ArretCard({ arret }: { arret: Arret }) {
   return (
-    <Link href={`/arrets/${arret.id}`} className="block">
-      <div className="bg-white rounded-xl border border-gray-200 p-4 active:bg-gray-50 hover:border-gray-300 transition-colors">
-        <div className="flex items-center gap-2 mb-2">
-          <span
-            className={`text-xs font-semibold px-2 py-0.5 rounded-full ${LANGUE_COLOR[arret.langue] ?? "bg-gray-100 text-gray-500"}`}
-          >
-            {LANGUE_LABEL[arret.langue] ?? arret.langue.toUpperCase()}
+    <Link href={`/arrets/${arret.id}`} className="block group">
+      <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm group-hover:shadow-md group-hover:border-gray-200 group-active:bg-gray-50 transition-all duration-150">
+        {/* Ligne 1 : langue + date */}
+        <div className="flex items-center justify-between mb-2">
+          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${LANGUE_COLOR[arret.langue] ?? "bg-gray-100 text-gray-500"}`}>
+            {arret.langue === "fr" ? "FR" : "NL"}
           </span>
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full ${STATUT_COLOR[arret.statut_traitement] ?? "bg-gray-100 text-gray-500"}`}
-          >
-            {STATUT_LABEL[arret.statut_traitement] ?? arret.statut_traitement}
-          </span>
-          <span className="ml-auto text-xs text-gray-400">
+          <span className="text-xs text-gray-400 tabular-nums">
             {formatDate(arret.date_arret)}
           </span>
         </div>
 
-        <p className="font-semibold text-gray-900 text-sm">{arret.numero}</p>
+        {/* Numéro d'arrêt */}
+        <p className="font-semibold text-gray-900 text-[15px] leading-snug">
+          {arret.numero}
+        </p>
 
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-gray-500">
-          {arret.matiere && <span>{arret.matiere}</span>}
-          {arret.pays_origine && (
-            <>
-              <span className="text-gray-300">·</span>
-              <span>{arret.pays_origine}</span>
-            </>
-          )}
-          {arret.chambre && (
-            <>
-              <span className="text-gray-300">·</span>
-              <span>{arret.chambre}</span>
-            </>
-          )}
-        </div>
+        {/* Métadonnées inline */}
+        {(arret.matiere || arret.pays_origine || arret.chambre) && (
+          <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1.5">
+            {arret.matiere && (
+              <span className="text-xs text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded">
+                {arret.matiere}
+              </span>
+            )}
+            {arret.pays_origine && (
+              <span className="text-xs text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded">
+                {arret.pays_origine}
+              </span>
+            )}
+            {arret.chambre && (
+              <span className="text-xs text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded">
+                {arret.chambre}
+              </span>
+            )}
+          </div>
+        )}
 
+        {/* Résumé */}
         {arret.resume && (
-          <p className="mt-2 text-xs text-gray-400 line-clamp-2">
+          <p className="mt-2 text-xs text-gray-400 line-clamp-2 leading-relaxed">
             {arret.resume}
           </p>
         )}
+
+        {/* Statut */}
+        <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-gray-50">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUT_DOT[arret.statut_traitement] ?? "bg-gray-300"}`} />
+          <span className="text-xs text-gray-400">
+            {STATUT_LABEL[arret.statut_traitement] ?? arret.statut_traitement}
+          </span>
+        </div>
       </div>
     </Link>
   );

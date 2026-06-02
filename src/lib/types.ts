@@ -62,6 +62,8 @@ export interface Arret {
   updated_at: string;
 }
 
+export type ValidationStatus = "correct" | "incorrect" | "incertain" | "absent" | "a_revoir";
+
 export interface ArretCriteriaValue {
   id: string;
   arret_id: string;
@@ -69,9 +71,12 @@ export interface ArretCriteriaValue {
   value_text: string | null;
   value_boolean: boolean | null;
   confidence: number | null;
+  evidence_excerpt: string | null;
   model_run_id: string | null;
   validated_by: string | null;
   validated_at: string | null;
+  validation_status: ValidationStatus | null;
+  validation_note: string | null;
   created_at: string;
 }
 
