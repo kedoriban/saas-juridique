@@ -4,9 +4,12 @@ Dernière mise à jour : 2026-06-04 (R-Phase 2 terminée)
 
 ## Objectif actuel
 
-**R-Phase 2 terminée** : `analyze.py`, `prompts.py`, `schemas.py` et `build_intermediate.py` adaptés au JSON intermédiaire. Migration 008 créée.
+**R-Phase 2 terminée + dry-run validé** sur CCE 341994 (36/~48 valeurs extraites, pipeline OK).
 
-Prochaine étape : appliquer la migration 008 dans Supabase, puis lancer un test dry-run sur 1 arrêt réel (R-Phase 3).
+Prochaine étape R-Phase 3 :
+1. Appliquer migration 008 dans Supabase (⚠ requis avant tout stockage).
+2. Re-extraire les 50 arrêts avec `main.py --limit 55` (populate `intermediate_json` + nouveaux noms de sections).
+3. Lancer `analyze.py --limit 20` pour validation intermédiaire avocate.
 
 ## Décisions validées
 
@@ -74,7 +77,7 @@ Prochaine étape : appliquer la migration 008 dans Supabase, puis lancer un test
 | Audit + correctifs | ✅ Terminé | C1-C3, I1-I7, W1-W3 appliqués — typecheck/lint 0 erreur |
 | **R-Phase 1. Préprocesseur renforcé** | ✅ **Terminé** | 7 nouveaux modules + migration 007 créée et **appliquée** |
 | **R-Phase 2. Analyse LLM via JSON intermédiaire** | ✅ **Terminé** | analyze.py + prompts.py + schemas.py + build_intermediate.py + migration 008 |
-| **R-Phase 3. Test sur échantillon réel** | 🔵 À faire | Appliquer migration 008, dry-run 1 arrêt, puis 20-30 arrêts réels |
+| **R-Phase 3. Test sur échantillon réel** | 🟡 En cours | dry-run OK (CCE 341994, 36 valeurs). Appliquer 008, re-extraire, analyser 20 arrêts |
 
 ## Interface validation — Refonte 2026-06-04
 
@@ -148,9 +151,55 @@ PDF → extract.py → clean.py
 `build_intermediate.py` — il suffira à `analyze.py` d'appeler cette méthode pour cibler
 les sections utiles par groupe de critères, sans envoyer tout le document au LLM.
 
+## R-Phase 2 — Résultats dry-run (2026-06-04)
+
+Arrêt testé : CCE 341994 (`08c34c35-14ec-4c57-8ef9-f208408aba3c`), langue FR, 44 sections reconstruites depuis fallback segments.
+
+| Groupe | Critères | Items OK | Durée | Notes |
+|---|---|---|---|---|
+| metadata | 7 | 7 | 150s | ✅ date, numéro, juge, avocat, chambre, date arrivée |
+| procedure | 6 | 6 | 105s | ✅ |
+| identity | 9 | 9 | 164s | ✅ nationalité, ethnie, religion, région, MENA |
+| profile_vulnerability | 15 | 3 | 72s | ⚠️ tronqué — qwen3:4b incapable de gérer 15 critères d'un coup |
+| decision_reasoning | 8 | 8 | 222s | ✅ motivation CCE, art.48/7, jurisprudence |
+| persecution_claims | 2 | 2 | 107s | ✅ |
+| evidence_documents | 1 | 1 | 45s | ✅ |
+| **Total** | **48** | **36** | **865s** | |
+
+Points observés :
+- `source_authority=CCE` correctement renseigné sur fr_043, fr_038, fr_048 (LLM lit les en-têtes de section)
+- `source_authority=unknown` sur la majorité → normal : les 50 arrêts ont été extraits sans authority (ancien pipeline)
+- `profile_vulnerability` tronqué : 3/15 items retournés. Pas un bloquant prod (Qwen2.5-32B plus capable)
+- 1 criterion_id invalide filtré dans profile_vulnerability (hallucination mineure)
+
 ## Prochaine action exacte
 
-**Étape 1 — Tester l'interface de validation sur un arrêt réel analysé :**
+**Étape 0 — Appliquer la migration 008 dans Supabase (SQL Editor) :**
+
+```sql
+-- Coller et exécuter le contenu de supabase/migrations/008_criteria_values_extended.sql
+```
+
+**Étape 1 — Re-extraire les 50 arrêts avec le nouveau pipeline :**
+
+```powershell
+cd C:\Projects\saas-juridique-cce-rvv\worker
+.venv\Scripts\activate
+$env:PYTHONIOENCODING="utf-8"
+python main.py --limit 55
+```
+
+Cela populera `intermediate_json`, `procedure_type`, `language_detected` et les nouveaux noms de sections.
+
+**Étape 2 — Analyser 20 arrêts et valider la qualité :**
+
+```powershell
+python analyze.py --limit 20
+```
+
+Puis ouvrir `/validation` dans l'app pour que l'avocate valide les extractions.
+
+**Étape 3 — Tester l'interface de validation sur un arrêt réel analysé :**
 
 Lancer l'app en local et vérifier que :
 - La page `/validation` liste les arrêts analysés sans artefacts JSON
@@ -181,24 +230,28 @@ Objectifs R-Phase 2 :
   `found / not_mentioned / not_applicable / ambiguous / inferred / conflicting / error`
 - Chaque résultat inclut : `source_authority`, `source_section`, `page_refs`, `quotes`, `needs_human_review`, `certainty`
 
+## Risques ouverts spécifiques R-Phase 3
+
+- **profile_vulnerability tronqué** : qwen3:4b retourne 3/15 items pour ce groupe. À monitorer avec Qwen2.5-32B. Si persistant, envisager de scinder le groupe en deux.
+- **source_authority=unknown** : tant que les arrêts ne sont pas re-extraits avec le nouveau `main.py`, l'authority restera `unknown`. Pas bloquant pour la validation.
+- **Migration 008 non appliquée** : `analyze.py` échouera sur `store_criteria_values()` sans cette migration.
+
 ## Prompt de reprise recommandé (après /clear)
 
 ```
 Reprends le projet (lis CLAUDE.md + PROJECT_STATE.md).
 
-L'interface de validation avocate a été refaite (2026-06-04) :
-- Artefacts JSON corrigés dans la fiche arrêt et la page validation
-- ValidationRow : textarea + Ctrl+Entrée
-- Page /validation/[id] : badge statut LLM, passage source en citation, stats par groupe
-- Page /validation : export global + stats enrichies
-- Nouveau /validation/export/route.ts : CSV d'audit complet
+R-Phase 2 terminée et validée (dry-run CCE 341994 : 36/48 items, pipeline OK).
+Migrations 007 et 008 créées (007 appliquée, 008 à appliquer avant tout stockage).
 
-La migration 007 est appliquée.
+Prochaine action : R-Phase 3
+1. Appliquer migration 008 dans Supabase (supabase/migrations/008_criteria_values_extended.sql)
+2. Re-extraire les 50 arrêts : python main.py --limit 55
+3. Analyser 20 arrêts : python analyze.py --limit 20
+4. Valider l'interface /validation avec l'avocate
 
-Prochaine action : R-Phase 2 — adapter analyze.py + prompts.py + schemas.py
-pour travailler depuis l'IntermediateDocument au lieu des segments bruts.
-
-Voir la section "Règle importante pour analyze.py (Phase 2)" dans PROJECT_STATE.md.
+Point de vigilance : profile_vulnerability retourne 3/15 items avec qwen3:4b (tronqué).
+À surveiller sur Qwen2.5-32B. Si persistant, scinder le groupe.
 ```
 
 ## Infrastructure Supabase
