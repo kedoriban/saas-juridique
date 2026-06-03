@@ -236,7 +236,7 @@ class VLLMProvider(LLMProvider):
 
     Variables d'environnement :
       VLLM_BASE_URL          = http://localhost:8000/v1
-      VLLM_MODEL             = Qwen/Qwen2.5-7B-Instruct (le modèle servi par vLLM)
+      VLLM_MODEL             = Qwen/Qwen2.5-32B-Instruct-AWQ (le modèle servi par vLLM)
       VLLM_API_KEY           = (optionnel) clé Bearer si le serveur en exige une
       LLM_TIMEOUT_SECONDS    = 180
       LLM_MAX_INPUT_CHARS    = 8000
@@ -248,7 +248,7 @@ class VLLMProvider(LLMProvider):
 
     def __init__(self) -> None:
         self.base_url = os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1").rstrip("/")
-        self.model = os.environ.get("VLLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+        self.model = os.environ.get("VLLM_MODEL", "Qwen/Qwen2.5-32B-Instruct-AWQ")
         self.api_key = os.environ.get("VLLM_API_KEY", "")
         self.timeout = int(os.environ.get("LLM_TIMEOUT_SECONDS", "180"))
         self.max_input_chars = int(os.environ.get("LLM_MAX_INPUT_CHARS", "8000"))
