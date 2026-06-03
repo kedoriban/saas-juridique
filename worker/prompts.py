@@ -1,46 +1,147 @@
 """
-Construction des prompts LLM par groupe de critères — Phase 5.
+Construction des prompts LLM par groupe de critères — R-Phase 2.
 
 Règles :
 - Le LLM ne reçoit jamais le texte complet de l'arrêt.
-- Il reçoit uniquement les passages candidats pour le groupe demandé.
+- Il reçoit uniquement les sections ciblées via get_sections_for_criteria_group().
 - Le total texte passé est plafonné à MAX_PASSAGE_CHARS.
-- Si non trouvé, répondre null (jamais inventer).
-- Confidence obligatoire (0.0-1.0).
-- Evidence excerpt si disponible.
+- Chaque section est annotée de son autorité source (CCE, CGRA, etc.).
+- Si non trouvé, répondre status="not_mentioned" (jamais inventer).
+- Confidence obligatoire si valeur trouvée (0.0-1.0).
 """
 
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
-# Plafond du texte de passages par appel (hors prompt système)
+from build_intermediate import IntermediateDocument, SectionEntry
+
 MAX_PASSAGE_CHARS = 5000
 
-# Mapping groupe → sections de segment prioritaires (ordre de pertinence)
+# Mapping groupe → section_ids prioritaires (ordre de pertinence).
+# Inclut les anciens noms (fallback arrêts pré-Phase-1) ET les nouveaux.
 GROUP_SECTIONS: dict[str, list[str]] = {
-    "metadata":             ["identite", "procedure", "dispositif"],
-    "procedure":            ["procedure", "faits", "decision_attaquee"],
-    "identity":             ["identite", "faits", "procedure"],
-    "profile_vulnerability":["faits", "identite", "arguments", "credibilite"],
-    "decision_reasoning":   ["analyse", "credibilite", "arguments", "dispositif"],
-    "persecution_claims":   ["arguments", "faits", "analyse"],
-    "evidence_documents":   ["documents", "analyse"],
-    "general":              ["faits", "analyse", "dispositif"],
+    "metadata": [
+        # Nouveaux (Phase 1)
+        "faits_invokes", "feitenrelaas",
+        "acte_attaque", "bestreden_beslissing",
+        "cadre_juridique", "juridisch_kader",
+        "dispositif", "dictum",
+        # Anciens (fallback)
+        "identite", "procedure", "dispositif",
+    ],
+    "procedure": [
+        "cadre_juridique", "juridisch_kader",
+        "acte_attaque", "bestreden_beslissing",
+        "extreme_urgence", "uiterst_dringende_noodzakelijkheid",
+        "jonction_affaires", "samenvoeging_zaken",
+        "non_comparution",
+        "procedure", "faits", "decision_attaquee",
+    ],
+    "identity": [
+        "faits_invokes", "feitenrelaas",
+        "these_partie_requerante", "standpunt_verzoekende_partij",
+        "acte_attaque", "bestreden_beslissing",
+        "identite", "faits", "procedure",
+    ],
+    "profile_vulnerability": [
+        "faits_invokes", "feitenrelaas",
+        "these_partie_requerante", "standpunt_verzoekende_partij",
+        "motivation_cgra_ou_oe", "motivering_cgvs_of_dv",
+        "faits", "identite", "arguments", "credibilite",
+    ],
+    "decision_reasoning": [
+        "article_48_7", "artikel_48_7",
+        "article_3_cedh", "artikel_3_evrm",
+        "article_8_cedh", "artikel_8_evrm",
+        "appreciation_48_3", "appreciation_48_4",
+        "beoordeling_vluchtelingenstatus",
+        "beoordeling_subsidiaire_bescherming",
+        "beoordeling",
+        "dispositif", "dictum",
+        "analyse", "credibilite", "arguments",
+    ],
+    "persecution_claims": [
+        "faits_invokes", "feitenrelaas",
+        "these_partie_requerante", "standpunt_verzoekende_partij",
+        "motivation_cgra_ou_oe", "motivering_cgvs_of_dv",
+        "nouveaux_elements", "nieuwe_elementen",
+        "arguments", "faits", "analyse",
+    ],
+    "evidence_documents": [
+        "motivation_cgra_ou_oe", "motivering_cgvs_of_dv",
+        "conclusion_cgra_ou_oe", "conclusie_cgvs_of_dv",
+        "nouveaux_elements", "nieuwe_elementen",
+        "faits_invokes", "feitenrelaas",
+        "documents", "analyse",
+    ],
+    "general": [
+        "faits_invokes", "feitenrelaas",
+        "these_partie_requerante", "standpunt_verzoekende_partij",
+        "article_48_7", "artikel_48_7",
+        "dispositif", "dictum",
+        "faits", "analyse",
+    ],
 }
 
 SYSTEM_PROMPT = """\
 /no_think
-Tu es un extracteur de données juridiques. Tu lis des passages d'arrêts belges du CCE/RVV et tu extrais des critères précis.
+Tu es un extracteur de données juridiques. Tu lis des sections d'arrêts belges du CCE/RVV annotées par leur autorité source, et tu extrais des critères précis.
 
 Règles ABSOLUES :
-- Tu extrais UNIQUEMENT les informations présentes dans les passages fournis.
-- Si une information est absente, tu retournes null. JAMAIS de valeur inventée.
+- Tu extrais UNIQUEMENT les informations présentes dans les sections fournies.
+- Si une information est absente, tu retournes null et status="not_mentioned". JAMAIS de valeur inventée.
 - Tu réponds UNIQUEMENT avec du JSON valide. Aucun texte avant ou après le JSON.
 - Tu utilises EXACTEMENT les criterion_id fournis, sans les modifier ni en inventer.
-- confidence : 0.0 à 1.0. Sois conservateur.
-- evidence_excerpt : citation courte (max 150 car.) copiée mot pour mot du passage.
+- confidence : 0.0 à 1.0, requis si status="found". Sois conservateur.
+- evidence_excerpt : citation courte (max 150 car.) copiée mot pour mot de la section.
+- source_authority : autorité de la section où tu trouves l'information (CCE, RvV, CGRA, CGVS, OE, DVZ, applicant, unknown).
+- source_section : section_id de la section source (ex: "article_48_7", "faits_invokes").
+
+Valeurs autorisées pour "status" :
+  found           = information clairement présente
+  not_mentioned   = information absente du texte fourni
+  not_applicable  = critère ne s'applique pas à ce type de procédure
+  ambiguous       = information présente mais contradictoire ou peu claire
+  inferred        = information déduite indirectement (pas citée explicitement)
+  conflicting     = informations contradictoires entre sections
+  error           = impossible d'analyser ce critère
 """
+
+
+def select_sections(
+    intermediate: IntermediateDocument,
+    group: str,
+    max_chars: int = MAX_PASSAGE_CHARS,
+) -> list[SectionEntry]:
+    """
+    Sélectionne les sections pertinentes pour le groupe de critères donné.
+    Appelle get_sections_for_criteria_group() puis applique le plafond de caractères.
+    Si aucune section ne correspond, retourne toutes les sections (fallback).
+    """
+    section_ids = GROUP_SECTIONS.get(group, [])
+    candidates = intermediate.get_sections_for_criteria_group(section_ids)
+
+    # Fallback : si aucune section ne correspond (noms inconnus), tout prendre
+    if not candidates:
+        candidates = list(intermediate.sections)
+
+    result: list[SectionEntry] = []
+    total = 0
+    for sec in candidates:
+        text = (sec.text or "").strip()
+        if not text:
+            continue
+        if total + len(text) > max_chars:
+            remaining = max_chars - total
+            if remaining > 200:
+                result.append(replace(sec, text=text[:remaining] + "\n[… tronqué …]"))
+            break
+        result.append(sec)
+        total += len(text)
+
+    return result
 
 
 def build_prompt(
@@ -48,50 +149,61 @@ def build_prompt(
     language: str,
     criterion_version: str,
     group: str,
-    criteria: list[dict],  # [{id, label, type}, ...]
-    passages: list[str],   # textes des segments candidats
+    criteria: list[dict],    # [{id, label, type}, ...]
+    sections: list[SectionEntry],
 ) -> tuple[str, str]:
     """
-    Construit le prompt pour un groupe de critères.
-    Retourne (system_prompt, user_prompt) séparément pour l'API chat.
+    Construit le prompt pour un groupe de critères à partir de sections ciblées.
+    Retourne (system_prompt, user_prompt) pour l'API chat.
     """
     lang_label = "français" if language == "fr" else "néerlandais"
 
-    # Tronquer les passages pour rester sous le plafond
-    joined = "\n\n---\n\n".join(passages)
-    if len(joined) > MAX_PASSAGE_CHARS:
-        joined = joined[:MAX_PASSAGE_CHARS] + "\n[... tronqué ...]"
+    # Formater les sections avec leur en-tête d'autorité
+    formatted: list[str] = []
+    total_chars = 0
+    for sec in sections:
+        auth = sec.authority or "unknown"
+        sid  = sec.section_id or "?"
+        title = f" — {sec.title_detected}" if sec.title_detected else ""
+        header = f"[Section: {sid} | Autorité: {auth}{title}]"
+        formatted.append(f"{header}\n{sec.text}")
+        total_chars += len(sec.text)
+
+    joined = "\n\n---\n\n".join(formatted) if formatted else "(aucune section disponible)"
 
     # Critères avec IDs exacts
     criteria_lines = "\n".join(
         f'  {i+1}. id="{c["id"]}" | {c["label"]} | type={c["type"]}'
         for i, c in enumerate(criteria)
     )
-
-    # Liste des IDs valides pour instruction explicite
     valid_ids_list = ", ".join(f'"{c["id"]}"' for c in criteria)
 
-    # Exemples concrets avec le premier et dernier critère réels
     ex_found = json.dumps({
-        "criterion_id": criteria[0]["id"] if criteria else "id_exemple",
-        "value": "exemple de valeur extraite",
-        "confidence": 0.85,
-        "evidence_excerpt": "copie exacte du texte source (max 150 car.)",
-        "status": "extracted",
+        "criterion_id":      criteria[0]["id"] if criteria else "id_exemple",
+        "value":             "exemple de valeur extraite",
+        "confidence":        0.85,
+        "evidence_excerpt":  "copie exacte du texte source (max 150 car.)",
+        "source_authority":  "CCE",
+        "source_section":    "article_48_7",
+        "needs_human_review":False,
+        "status":            "found",
     }, ensure_ascii=False)
 
     ex_absent = json.dumps({
-        "criterion_id": criteria[-1]["id"] if len(criteria) > 1 else "id_exemple_2",
-        "value": None,
-        "confidence": None,
-        "evidence_excerpt": None,
-        "status": "not_found",
+        "criterion_id":      criteria[-1]["id"] if len(criteria) > 1 else "id_exemple_2",
+        "value":             None,
+        "confidence":        None,
+        "evidence_excerpt":  None,
+        "source_authority":  None,
+        "source_section":    None,
+        "needs_human_review":False,
+        "status":            "not_mentioned",
     }, ensure_ascii=False)
 
     user_prompt = f"""Langue du document : {lang_label} ({language})
 Groupe de critères : {group}
 
-## PASSAGES DE L'ARRÊT ({len(joined)} caractères)
+## SECTIONS DE L'ARRÊT ({len(sections)} section(s), {total_chars} caractères)
 {joined}
 
 ## CRITÈRES À EXTRAIRE ({len(criteria)} critères)
@@ -114,42 +226,3 @@ Produis exactement {len(criteria)} items dans "items", un par criterion_id list�
 Commence ta réponse par {{ :"""
 
     return SYSTEM_PROMPT, user_prompt
-
-
-def select_passages(
-    segments: list[dict],
-    group: str,
-    max_chars: int = MAX_PASSAGE_CHARS,
-) -> list[str]:
-    """
-    Sélectionne et ordonne les segments pertinents pour le groupe donné.
-    Respecte le plafond max_chars au total.
-    """
-    priority_sections = GROUP_SECTIONS.get(group, [])
-
-    # Trier : sections prioritaires d'abord, puis par quality_score décroissant
-    def sort_key(seg: dict) -> tuple[int, float]:
-        sec = seg.get("section") or ""
-        try:
-            prio = priority_sections.index(sec)
-        except ValueError:
-            prio = len(priority_sections)
-        return (prio, -(seg.get("quality_score") or 0.0))
-
-    sorted_segs = sorted(segments, key=sort_key)
-
-    selected: list[str] = []
-    total = 0
-    for seg in sorted_segs:
-        text = (seg.get("text") or "").strip()
-        if not text:
-            continue
-        if total + len(text) > max_chars:
-            remaining = max_chars - total
-            if remaining > 200:
-                selected.append(text[:remaining])
-            break
-        selected.append(text)
-        total += len(text)
-
-    return selected

@@ -1,25 +1,23 @@
 """
-Analyse LLM locale des arrêts CCE/RVV — Phase 5.
+Analyse LLM locale des arrêts CCE/RVV — R-Phase 2.
 
 Pipeline :
   1. Charger les critères actifs depuis Supabase (ou fichier local).
-  2. Charger les segments de l'arrêt.
-  3. Pour chaque groupe LLM, sélectionner les passages candidats.
+  2. Charger l'IntermediateDocument (cache disque → Supabase → fallback segments).
+  3. Pour chaque groupe LLM, sélectionner les sections pertinentes.
   4. Appeler le LLM (≤ MAX_PASSAGE_CHARS par appel).
   5. Valider le JSON retourné.
   6. Stocker dans arret_criteria_values + model_runs.
   7. En cas d'erreur, retenter une fois puis marquer erreur.
+
+Prérequis : migration 008 appliquée sur Supabase
+  (colonnes source_authority, source_section, needs_human_review).
 
 Usage :
   python analyze.py --arret-id <uuid>
   python analyze.py --arret-id <uuid> --dry-run
   python analyze.py --arret-id <uuid> --group identity
   python analyze.py --limit 3
-
-Contraintes :
-  - Jamais plus de MAX_PASSAGE_CHARS par appel LLM.
-  - Modèle petit quantifié uniquement.
-  - Pas de traitement massif (--limit défaut = 3).
 """
 
 from __future__ import annotations
@@ -37,14 +35,19 @@ _ENV_PATH = Path(__file__).parent.parent / ".env.local"
 load_dotenv(dotenv_path=_ENV_PATH)
 
 from llm_provider import get_provider, LLMResponse
-from schemas import RESPONSE_SCHEMA, validate_response, normalize_response
-from prompts import build_prompt, select_passages
+from schemas import RESPONSE_SCHEMA, PROMPT_VERSION, validate_response, normalize_response
+from prompts import build_prompt, select_sections
+from build_intermediate import (
+    IntermediateDocument, DocumentInfo, ExtractionQuality,
+    MetadataDetected, ApplicantsDetection, SectionEntry,
+)
 
-MAX_RETRIES = 2  # 2 retries après échec = 3 tentatives max par groupe
+MAX_RETRIES = 2
 
-# Valeurs textuelles converties en value_boolean pour les critères de type 'boolean'
-BOOL_TRUE = {"oui", "true", "ja"}
+BOOL_TRUE  = {"oui", "true", "ja"}
 BOOL_FALSE = {"non", "false", "nee"}
+
+_INTERMEDIATE_DIR = Path(__file__).parent.parent / ".tmp" / "intermediate"
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +64,13 @@ def _get_supabase():
 
 
 def fetch_arret(client, arret_id: str) -> dict | None:
-    res = client.table("arrets").select("id, numero, langue").eq("id", arret_id).maybe_single().execute()
+    res = (
+        client.table("arrets")
+        .select("id, numero, langue, pdf_url")
+        .eq("id", arret_id)
+        .maybe_single()
+        .execute()
+    )
     return res.data
 
 
@@ -69,13 +78,12 @@ def fetch_pending_analyze(client, limit: int) -> list[dict]:
     """Arrêts dont l'extraction est terminée mais l'analyse pas encore faite."""
     res = (
         client.table("arrets")
-        .select("id, numero, langue")
+        .select("id, numero, langue, pdf_url")
         .eq("statut_traitement", "termine")
         .limit(limit)
         .execute()
     )
     arrets = res.data or []
-    # Exclure ceux qui ont déjà des valeurs extraites
     result = []
     for a in arrets:
         check = (
@@ -93,7 +101,7 @@ def fetch_pending_analyze(client, limit: int) -> list[dict]:
 def fetch_segments(client, arret_id: str) -> list[dict]:
     res = (
         client.table("arret_segments")
-        .select("section, text, quality_score, segment_index")
+        .select("section, text, quality_score, segment_index, authority, section_title, page_start, page_end")
         .eq("arret_id", arret_id)
         .order("segment_index")
         .execute()
@@ -102,7 +110,6 @@ def fetch_segments(client, arret_id: str) -> list[dict]:
 
 
 def fetch_criteria(client, language: str) -> list[dict]:
-    """Charge les critères actifs pour la langue donnée."""
     res = (
         client.table("criteria")
         .select("id, label_original, expected_value_type, llm_group, section_slug")
@@ -115,7 +122,6 @@ def fetch_criteria(client, language: str) -> list[dict]:
 
 
 def load_criteria_from_file(language: str) -> list[dict]:
-    """Fallback : charge depuis data/criteria_canonical.json."""
     path = Path(__file__).parent.parent / "data" / "criteria_canonical.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     return [
@@ -124,20 +130,37 @@ def load_criteria_from_file(language: str) -> list[dict]:
     ]
 
 
-def store_model_run(client, arret_id: str, model: str, duration_ms: int, group: str, status: str) -> str:
+def store_model_run(
+    client,
+    arret_id: str,
+    model: str,
+    duration_ms: int,
+    group: str,
+    status: str,
+    criteria_version: str = "",
+    prompt_version: str = "",
+) -> str:
     res = client.table("model_runs").insert({
-        "arret_id":      arret_id,
-        "model_name":    model,
-        "model_version": model,
-        "duration_ms":   duration_ms,
-        "status":        status,
-        "prompt_tokens": None,
-        "completion_tokens": None,
+        "arret_id":                arret_id,
+        "model_name":              model,
+        "model_version":           model,
+        "duration_ms":             duration_ms,
+        "status":                  status,
+        "prompt_tokens":           None,
+        "completion_tokens":       None,
+        "criteria_schema_version": criteria_version or None,
+        "analysis_prompt_version": prompt_version or None,
     }).execute()
     return res.data[0]["id"] if res.data else ""
 
 
-def store_criteria_values(client, arret_id: str, items: list[dict], model_run_id: str) -> None:
+def store_criteria_values(
+    client,
+    arret_id: str,
+    items: list[dict],
+    model_run_id: str,
+) -> None:
+    """Stocke les valeurs extraites. Requiert migration 008 pour les nouveaux champs."""
     for item in items:
         if not item.get("criterion_id"):
             continue
@@ -150,13 +173,16 @@ def store_criteria_values(client, arret_id: str, items: list[dict], model_run_id
             elif token in BOOL_FALSE:
                 value_boolean, value_text = False, None
         row = {
-            "arret_id":        arret_id,
-            "criterion_id":    item["criterion_id"],
-            "value_text":      value_text,
-            "value_boolean":   value_boolean,
-            "confidence":      item.get("confidence"),
-            "evidence_excerpt": item.get("evidence_excerpt"),
-            "model_run_id":    model_run_id,
+            "arret_id":          arret_id,
+            "criterion_id":      item["criterion_id"],
+            "value_text":        value_text,
+            "value_boolean":     value_boolean,
+            "confidence":        item.get("confidence"),
+            "evidence_excerpt":  item.get("evidence_excerpt"),
+            "model_run_id":      model_run_id,
+            "source_authority":  item.get("source_authority"),
+            "source_section":    item.get("source_section"),
+            "needs_human_review": item.get("needs_human_review", False),
         }
         client.table("arret_criteria_values").upsert(row, on_conflict="arret_id,criterion_id").execute()
 
@@ -171,6 +197,133 @@ def store_processing_job(client, arret_id: str, status: str, error: str | None =
 
 
 # ---------------------------------------------------------------------------
+# Chargement du document intermédiaire
+# ---------------------------------------------------------------------------
+
+def _segments_to_intermediate(
+    segments: list[dict],
+    language: str,
+    pdf_url: str = "",
+) -> IntermediateDocument:
+    """
+    Construit un IntermediateDocument minimal depuis des segments Supabase.
+    Utilisé comme fallback quand intermediate_json est absent.
+    """
+    sections_dict: dict[str | None, SectionEntry] = {}
+    seen_order: list[str | None] = []
+
+    for seg in sorted(segments, key=lambda s: s.get("segment_index", 0)):
+        sid = seg.get("section")
+        if sid not in sections_dict:
+            seen_order.append(sid)
+            sections_dict[sid] = SectionEntry(
+                section_id=sid,
+                title_detected=seg.get("section_title"),
+                start_page=seg.get("page_start"),
+                end_page=seg.get("page_end"),
+                authority=seg.get("authority") or "unknown",
+                text=seg.get("text") or "",
+            )
+        else:
+            entry = sections_dict[sid]
+            extra = seg.get("text") or ""
+            if extra:
+                entry.text += "\n\n" + extra
+
+    sections = [sections_dict[sid] for sid in seen_order]
+    total_len = sum(len(s.text) for s in sections)
+
+    return IntermediateDocument(
+        document=DocumentInfo(
+            pdf_url=pdf_url,
+            decision_id=None,
+            decision_number=None,
+            language=language,
+            language_confidence=1.0,
+            procedure_type="unknown",
+            procedure_confidence=0.0,
+            requires_main_criteria=True,
+            procedure_signals=[],
+            decision_date=None,
+        ),
+        extraction_quality=ExtractionQuality(
+            method="segments_fallback",
+            pages_count=0,
+            text_length=total_len,
+            ocr_used=False,
+            quality_score=0.0,
+            requires_human_review=True,
+            review_reasons=["Construit depuis arret_segments — pas de JSON intermédiaire"],
+        ),
+        metadata_detected=MetadataDetected(
+            judge=None, lawyer=None, defendant=None,
+            appeal_date=None, attacked_decision_date=None,
+            extraction_notes=["fallback depuis arret_segments"],
+        ),
+        applicants_detection=ApplicantsDetection(
+            is_multi_applicant=False,
+            applicant_count=None,
+            jonction=False,
+            family_signals=False,
+            detection_notes=[],
+        ),
+        applicants=[],
+        sections=sections,
+    )
+
+
+def load_intermediate(
+    arret_id: str,
+    client,
+    language: str,
+    pdf_url: str = "",
+) -> IntermediateDocument | None:
+    """
+    Charge l'IntermediateDocument dans cet ordre de priorité :
+      1. Cache disque .tmp/intermediate/<arret_id>.json
+      2. Supabase arrets.intermediate_json
+      3. Fallback : reconstruction depuis arret_segments
+    Retourne None si aucune source ne contient de données utilisables.
+    """
+    # 1. Cache disque
+    cache_path = _INTERMEDIATE_DIR / f"{arret_id}.json"
+    if cache_path.exists():
+        try:
+            data = json.loads(cache_path.read_text(encoding="utf-8"))
+            doc = IntermediateDocument.from_dict(data)
+            print(f"  Interméd. : cache disque ({len(doc.sections)} sections)")
+            return doc
+        except Exception as exc:
+            print(f"  [WARN] Cache intermédiaire corrompu : {exc}")
+
+    # 2. Supabase intermediate_json
+    try:
+        res = (
+            client.table("arrets")
+            .select("intermediate_json")
+            .eq("id", arret_id)
+            .maybe_single()
+            .execute()
+        )
+        raw = res.data and res.data.get("intermediate_json")
+        if raw:
+            doc = IntermediateDocument.from_dict(raw)
+            print(f"  Interméd. : Supabase ({len(doc.sections)} sections)")
+            return doc
+    except Exception as exc:
+        print(f"  [WARN] intermediate_json Supabase : {exc}")
+
+    # 3. Fallback segments
+    print(f"  Interméd. : pas de JSON → fallback segments")
+    segments = fetch_segments(client, arret_id)
+    if not segments:
+        return None
+    doc = _segments_to_intermediate(segments, language=language, pdf_url=pdf_url)
+    print(f"  Interméd. : {len(doc.sections)} sections reconstruites depuis segments")
+    return doc
+
+
+# ---------------------------------------------------------------------------
 # Analyse d'un groupe
 # ---------------------------------------------------------------------------
 
@@ -180,17 +333,17 @@ def analyze_group(
     criterion_version: str,
     group: str,
     criteria: list[dict],
-    segments: list[dict],
+    intermediate: IntermediateDocument,
     provider,
     dry_run: bool,
 ) -> tuple[list[dict], LLMResponse | None]:
     """
-    Analyse un groupe de critères. Retourne (items_validés, llm_response).
-    Tente MAX_RETRIES+1 fois en cas d'erreur JSON ou de validation.
+    Analyse un groupe de critères depuis l'IntermediateDocument.
+    Retourne (items_validés, llm_response).
     """
-    passages = select_passages(segments, group)
-    if not passages:
-        print(f"    [SKIP] Aucun passage pour le groupe '{group}'")
+    sections = select_sections(intermediate, group)
+    if not sections:
+        print(f"    [SKIP] Aucune section pour le groupe '{group}'")
         return [], None
 
     system_prompt, user_prompt = build_prompt(
@@ -199,11 +352,11 @@ def analyze_group(
         criterion_version=criterion_version,
         group=group,
         criteria=[{"id": c["id"], "label": c["label_original"], "type": c["expected_value_type"]} for c in criteria],
-        passages=passages,
+        sections=sections,
     )
     prompt = (system_prompt, user_prompt)
 
-    valid_ids = {c["id"] for c in criteria}
+    valid_ids  = {c["id"] for c in criteria}
     type_by_id = {c["id"]: c.get("expected_value_type") for c in criteria}
     last_response: LLMResponse | None = None
 
@@ -231,12 +384,11 @@ def analyze_group(
             print(f"    [ERR] Tentative {attempt+1} — Validation: {'; '.join(errors)}")
             continue
 
-        # Succès
         items = normalized.get("items", [])
         for item in items:
             item["expected_value_type"] = type_by_id.get(item.get("criterion_id"))
         if normalized.get("warnings"):
-            print(f"    [WARN] {'; '.join(response.parsed['warnings'])}")
+            print(f"    [WARN] {'; '.join(normalized['warnings'])}")
         return items, response
 
     return [], last_response
@@ -254,17 +406,17 @@ def analyze_arret(
     provider,
     dry_run: bool,
     target_group: str | None = None,
+    pdf_url: str = "",
 ) -> bool:
     print(f"\n[{numero}] Analyse LLM — langue={language}")
 
-    segments = fetch_segments(client, arret_id)
-    if not segments:
-        print(f"  Aucun segment trouvé pour cet arrêt (extraction requise d'abord).")
+    # Charger l'IntermediateDocument
+    intermediate = load_intermediate(arret_id, client, language=language, pdf_url=pdf_url)
+    if not intermediate:
+        print(f"  Aucune donnée disponible (extraction requise d'abord).")
         return False
 
-    print(f"  Segments chargés : {len(segments)}")
-
-    # Charger les critères (Supabase d'abord, fallback fichier)
+    # Charger les critères
     try:
         criteria_all = fetch_criteria(client, language)
     except Exception:
@@ -290,7 +442,6 @@ def analyze_arret(
 
     all_items: list[dict] = []
     total_duration_ms = 0
-    success = True
 
     for group, group_criteria in groups.items():
         print(f"  → Groupe '{group}' ({len(group_criteria)} critères)...")
@@ -300,7 +451,7 @@ def analyze_arret(
             criterion_version=criterion_version,
             group=group,
             criteria=group_criteria,
-            segments=segments,
+            intermediate=intermediate,
             provider=provider,
             dry_run=dry_run,
         )
@@ -310,7 +461,7 @@ def analyze_arret(
             status_label = "OK" if items else "ERREUR"
             print(f"     {status_label} — {len(items)} items — {response.duration_ms}ms")
         else:
-            print(f"     SKIP (aucun passage)")
+            print(f"     SKIP (aucune section)")
 
         all_items.extend(items)
 
@@ -319,20 +470,26 @@ def analyze_arret(
     if dry_run:
         print("  → dry-run, rien stocké.")
         for item in all_items:
-            print(f"    {item['criterion_id']}: {item.get('value')!r} (conf={item.get('confidence')})")
+            flag = " ⚠" if item.get("needs_human_review") else ""
+            print(
+                f"    {item['criterion_id']}: {item.get('value')!r} "
+                f"(status={item.get('status')}, conf={item.get('confidence')}, "
+                f"auth={item.get('source_authority')}{flag})"
+            )
         return True
 
-    # Stocker model_run
+    model_name = provider.model if hasattr(provider, "model") else "unknown"
     model_run_id = store_model_run(
         client,
         arret_id=arret_id,
-        model=provider.model if hasattr(provider, "model") else "unknown",
+        model=model_name,
         duration_ms=total_duration_ms,
         group=target_group or "all",
         status="done" if all_items else "error",
+        criteria_version=criterion_version,
+        prompt_version=PROMPT_VERSION,
     )
 
-    # Stocker les valeurs
     if all_items:
         store_criteria_values(client, arret_id=arret_id, items=all_items, model_run_id=model_run_id)
 
@@ -346,19 +503,20 @@ def analyze_arret(
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Analyse LLM locale CCE/RVV — Phase 5")
+    parser = argparse.ArgumentParser(description="Analyse LLM locale CCE/RVV — R-Phase 2")
     parser.add_argument("--arret-id", help="UUID d'un arrêt spécifique")
     parser.add_argument("--group",    help="Analyser uniquement ce groupe LLM (ex: identity)")
     parser.add_argument("--limit",    type=int, default=3, help="Nb max d'arrêts en batch (défaut: 3)")
     parser.add_argument("--concurrency", type=int, default=1,
-                        help="Nb d'arrêts traités en parallèle (défaut: 1 = séquentiel). "
-                             "Monter à 16-32 avec un serveur vLLM pour exploiter le batching.")
+                        help="Nb d'arrêts traités en parallèle (défaut: 1). "
+                             "Monter à 16-32 avec un serveur vLLM.")
     parser.add_argument("--dry-run",  action="store_true", help="Affiche sans écrire en base")
     args = parser.parse_args()
 
     client = _get_supabase()
     provider = get_provider()
     print(f"Provider : {type(provider).__name__} | Modèle : {getattr(provider, 'model', '?')}")
+    print(f"Prompt version : {PROMPT_VERSION}")
 
     if args.arret_id:
         arret = fetch_arret(client, args.arret_id)
@@ -372,6 +530,7 @@ def main() -> None:
             provider=provider,
             dry_run=args.dry_run,
             target_group=args.group,
+            pdf_url=arret.get("pdf_url", ""),
         )
     else:
         arrets = fetch_pending_analyze(client, args.limit)
@@ -390,6 +549,7 @@ def main() -> None:
                 provider=provider,
                 dry_run=args.dry_run,
                 target_group=args.group,
+                pdf_url=a.get("pdf_url", ""),
             )
 
         ok = 0
@@ -398,9 +558,6 @@ def main() -> None:
                 if _run_one(a, client):
                     ok += 1
         else:
-            # Un client Supabase par thread (postgrest-py n'est pas thread-safe) ;
-            # le provider est sans état, partageable. NB : les logs s'entrelacent
-            # à forte concurrence — utiliser --arret-id pour un suivi qualité ligne à ligne.
             with ThreadPoolExecutor(max_workers=args.concurrency) as executor:
                 futures = {executor.submit(_run_one, a, _get_supabase()): a for a in arrets}
                 for future in as_completed(futures):
