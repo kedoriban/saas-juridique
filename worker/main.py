@@ -33,6 +33,7 @@ load_dotenv(dotenv_path=_ENV_PATH)
 
 from extract import extract_from_url, ExtractionResult
 from clean import clean_and_segment, Segment
+from build_intermediate import build_intermediate, IntermediateDocument
 
 
 def _get_supabase_client():
@@ -45,6 +46,21 @@ def _get_supabase_client():
             "manquantes. Vérifier .env.local à la racine du projet."
         )
     return create_client(url, key)
+
+
+# ---------------------------------------------------------------------------
+# Cache disque des JSON intermédiaires
+# ---------------------------------------------------------------------------
+
+_INTERMEDIATE_DIR = Path(__file__).parent.parent / ".tmp" / "intermediate"
+
+
+def _save_intermediate(doc: IntermediateDocument, arret_id: str) -> Path:
+    """Sauvegarde le JSON intermédiaire dans .tmp/intermediate/<arret_id>.json."""
+    _INTERMEDIATE_DIR.mkdir(parents=True, exist_ok=True)
+    path = _INTERMEDIATE_DIR / f"{arret_id}.json"
+    doc.save(path)
+    return path
 
 
 # ---------------------------------------------------------------------------
@@ -92,10 +108,26 @@ def store_segments(client, arret_id: str, segments: list[Segment]) -> None:
             "page_start":    s.page_start,
             "page_end":      s.page_end,
             "quality_score": s.quality_score,
+            "authority":     s.authority,
+            "section_title": s.section_title,
         }
         for s in segments
     ]
     client.table("arret_segments").insert(rows).execute()
+
+
+def store_intermediate_data(
+    client,
+    arret_id: str,
+    intermediate: IntermediateDocument,
+) -> None:
+    """Met à jour la ligne arrets avec les données du JSON intermédiaire."""
+    doc = intermediate.document
+    client.table("arrets").update({
+        "procedure_type":    doc.procedure_type,
+        "language_detected": doc.language,
+        "intermediate_json": intermediate.to_dict(),
+    }).eq("id", arret_id).execute()
 
 
 def mark_done(client, arret_id: str, success: bool, error: str | None = None) -> None:
@@ -145,15 +177,30 @@ def process_arret(
     print(f"  Segments  : {len(segments)}")
     for s in segments:
         section_label = s.section or "?"
-        print(f"    [{section_label:20s}] p{s.page_start}-{s.page_end}  {s.char_count} car.  score={s.quality_score}")
+        print(f"    [{section_label:30s}] auth={s.authority:8s}  p{s.page_start}-{s.page_end}  {s.char_count} car.")
+
+    # Construire le JSON intermédiaire (détection langue / procédure / métadonnées)
+    intermediate = build_intermediate(pdf_url, result, segments)
+    doc = intermediate.document
+    q = intermediate.extraction_quality
+    print(f"  Langue    : {doc.language} ({doc.language_confidence:.0%})")
+    print(f"  Procédure : {doc.procedure_type} ({doc.procedure_confidence:.0%})")
+    print(f"  Décision  : {doc.decision_id or '?'}  |  {doc.decision_date or '?'}")
+    if q.requires_human_review:
+        print(f"  ⚠ Revue humaine : {'; '.join(q.review_reasons)}")
+
+    # Sauvegarder le JSON intermédiaire sur disque (cache local)
+    cache_path = _save_intermediate(intermediate, arret_id)
+    print(f"  Interméd. : {cache_path}")
 
     if not dry_run:
         store_extraction(client, arret_id, result)
         store_segments(client, arret_id, segments)
+        store_intermediate_data(client, arret_id, intermediate)
         mark_done(client, arret_id, success=True)
-        print(f"  -> OK (stocke)")
+        print(f"  -> OK (stocké)")
     else:
-        print(f"  -> OK (dry-run, rien stocke)")
+        print(f"  -> OK (dry-run, rien stocké)")
 
     return True
 

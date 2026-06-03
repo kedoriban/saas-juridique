@@ -58,6 +58,8 @@ export interface Arret {
   pdf_url: string | null;
   resume: string | null;
   statut_traitement: "en_attente" | "en_cours" | "termine" | "erreur";
+  procedure_type: string | null;
+  language_detected: string | null;
   created_at: string;
   updated_at: string;
 }
