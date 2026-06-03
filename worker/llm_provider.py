@@ -230,8 +230,116 @@ class OllamaProvider(LLMProvider):
         )
 
 
+class VLLMProvider(LLMProvider):
+    """
+    Provider pour un serveur vLLM (API compatible OpenAI) — run de production GPU.
+
+    Variables d'environnement :
+      VLLM_BASE_URL          = http://localhost:8000/v1
+      VLLM_MODEL             = Qwen/Qwen2.5-7B-Instruct (le modèle servi par vLLM)
+      VLLM_API_KEY           = (optionnel) clé Bearer si le serveur en exige une
+      LLM_TIMEOUT_SECONDS    = 180
+      LLM_MAX_INPUT_CHARS    = 8000
+      LLM_MAX_OUTPUT_TOKENS  = 3000
+
+    guided_json contraint la sortie à un JSON conforme au schéma ; le batching
+    se fait côté serveur via des requêtes concurrentes (cf. --concurrency).
+    """
+
+    def __init__(self) -> None:
+        self.base_url = os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1").rstrip("/")
+        self.model = os.environ.get("VLLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+        self.api_key = os.environ.get("VLLM_API_KEY", "")
+        self.timeout = int(os.environ.get("LLM_TIMEOUT_SECONDS", "180"))
+        self.max_input_chars = int(os.environ.get("LLM_MAX_INPUT_CHARS", "8000"))
+        self.max_output_tokens = int(os.environ.get("LLM_MAX_OUTPUT_TOKENS", "3000"))
+
+    def complete(
+        self,
+        prompt: str | tuple[str, str],
+        json_schema: dict[str, Any] | None = None,
+    ) -> LLMResponse:
+        if isinstance(prompt, tuple):
+            system_prompt, user_prompt = prompt
+        else:
+            system_prompt, user_prompt = "", prompt
+
+        if len(user_prompt) > self.max_input_chars:
+            user_prompt = user_prompt[: self.max_input_chars]
+
+        messages: list[dict[str, str]] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": user_prompt})
+
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.0,
+            "max_tokens": self.max_output_tokens,
+            "stream": False,
+        }
+        # guided_json : extension vLLM qui force une sortie conforme au schéma
+        if json_schema is not None:
+            payload["guided_json"] = json_schema
+
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        prompt_chars = len(system_prompt) + len(user_prompt)
+        t0 = time.monotonic()
+        try:
+            resp = requests.post(
+                f"{self.base_url}/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=self.timeout,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except requests.RequestException as exc:
+            return LLMResponse(
+                raw_text="",
+                parsed=None,
+                model=self.model,
+                duration_ms=int((time.monotonic() - t0) * 1000),
+                prompt_chars=prompt_chars,
+                error=str(exc),
+            )
+
+        duration_ms = int((time.monotonic() - t0) * 1000)
+        try:
+            content = data["choices"][0]["message"]["content"] or ""
+        except (KeyError, IndexError, TypeError) as exc:
+            return LLMResponse(
+                raw_text=json.dumps(data)[:2000],
+                parsed=None,
+                model=self.model,
+                duration_ms=duration_ms,
+                prompt_chars=prompt_chars,
+                error=f"Reponse vLLM inattendue : {exc}",
+            )
+
+        # guided_json garantit normalement un JSON valide ; fallback robuste sinon
+        parsed = _try_parse(content)
+        error = None
+        if parsed is None:
+            parsed, error = _extract_json(content)
+        return LLMResponse(
+            raw_text=content,
+            parsed=parsed,
+            model=self.model,
+            duration_ms=duration_ms,
+            prompt_chars=prompt_chars,
+            error=error,
+        )
+
+
 def get_provider() -> LLMProvider:
     provider = os.environ.get("LLM_PROVIDER", "ollama").lower()
     if provider == "ollama":
         return OllamaProvider()
-    raise ValueError(f"Provider LLM non supporté : '{provider}'. Seule la valeur 'ollama' est disponible au MVP.")
+    if provider == "vllm":
+        return VLLMProvider()
+    raise ValueError(f"Provider LLM non supporté : '{provider}'. Valeurs disponibles : 'ollama', 'vllm'.")

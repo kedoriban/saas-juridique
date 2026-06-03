@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -349,6 +350,9 @@ def main() -> None:
     parser.add_argument("--arret-id", help="UUID d'un arrêt spécifique")
     parser.add_argument("--group",    help="Analyser uniquement ce groupe LLM (ex: identity)")
     parser.add_argument("--limit",    type=int, default=3, help="Nb max d'arrêts en batch (défaut: 3)")
+    parser.add_argument("--concurrency", type=int, default=1,
+                        help="Nb d'arrêts traités en parallèle (défaut: 1 = séquentiel). "
+                             "Monter à 16-32 avec un serveur vLLM pour exploiter le batching.")
     parser.add_argument("--dry-run",  action="store_true", help="Affiche sans écrire en base")
     args = parser.parse_args()
 
@@ -374,20 +378,38 @@ def main() -> None:
         if not arrets:
             print("Aucun arrêt prêt pour analyse (statut=termine sans valeurs).")
             return
-        print(f"{len(arrets)} arrêt(s) à analyser (limite={args.limit}, dry_run={args.dry_run})")
-        ok = 0
-        for a in arrets:
-            success = analyze_arret(
+        print(f"{len(arrets)} arrêt(s) à analyser (limite={args.limit}, "
+              f"concurrence={args.concurrency}, dry_run={args.dry_run})")
+
+        def _run_one(a: dict, task_client) -> bool:
+            return analyze_arret(
                 arret_id=a["id"],
                 numero=a.get("numero", a["id"]),
                 language=a["langue"],
-                client=client,
+                client=task_client,
                 provider=provider,
                 dry_run=args.dry_run,
                 target_group=args.group,
             )
-            if success:
-                ok += 1
+
+        ok = 0
+        if args.concurrency <= 1:
+            for a in arrets:
+                if _run_one(a, client):
+                    ok += 1
+        else:
+            # Un client Supabase par thread (postgrest-py n'est pas thread-safe) ;
+            # le provider est sans état, partageable. NB : les logs s'entrelacent
+            # à forte concurrence — utiliser --arret-id pour un suivi qualité ligne à ligne.
+            with ThreadPoolExecutor(max_workers=args.concurrency) as executor:
+                futures = {executor.submit(_run_one, a, _get_supabase()): a for a in arrets}
+                for future in as_completed(futures):
+                    a = futures[future]
+                    try:
+                        if future.result():
+                            ok += 1
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"[{a.get('numero', a['id'])}] EXCEPTION : {exc}")
         print(f"\nRésumé : {ok}/{len(arrets)} arrêts analysés avec succès.")
 
 

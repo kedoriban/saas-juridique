@@ -1,6 +1,6 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-03 (correctifs audit appliqués : C1-C3, I1-I7, W1-W3 — typecheck/lint OK)
+Dernière mise à jour : 2026-06-03 (provider vLLM + parallélisation worker + runbook GPU loué — py_compile OK)
 
 ## Objectif actuel
 
@@ -34,6 +34,9 @@ Valider la qualité des extractions LLM sur ~50 arrêts réels (30 FR + 20 NL) a
 - **Le suffixe `.an_` dans les URLs PDF n'est PAS un code langue** — lié à la procédure. La langue est forcée depuis `--lang` lors du scraping filtré.
 - **Limite de validation relevée à 100 arrêts** (était 50).
 - **Critères fusionnés FR (`fr_025`, `fr_033`) conservés en l'état jusqu'à validation cliente.**
+- **Corpus prod = 181 802 arrêts** (~1,45M appels LLM) — infaisable sur le laptop (~1-2 ans). Traitement sur **GPU loué à l'heure** (Vast.ai/Runpod), zéro token API, ~15-30 €.
+- **Worker portable Ollama → vLLM** : `VLLMProvider` (API OpenAI-compat, `guided_json` strict) activé par `LLM_PROVIDER=vllm` ; `analyze.py --concurrency N` (ThreadPoolExecutor, 1 client Supabase/thread) pour exploiter le batching vLLM. Défaut `--concurrency 1` = inchangé.
+- **Test 50 arrêts** : tourne sur GPU loué via Ollama (pas besoin de vLLM), ~1-2 €. Runbook complet : [`worker/DEPLOY_GPU.md`](worker/DEPLOY_GPU.md).
 
 ## Stack retenue
 
