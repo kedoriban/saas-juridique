@@ -29,7 +29,7 @@ Community**), louer une instance **Ubuntu 22.04 + CUDA**, puis en SSH :
 sudo apt-get update && sudo apt-get install -y python3-venv git
 git clone https://github.com/kedoriban/saas-juridique.git
 cd saas-juridique
-git checkout phase-02-criteres
+# main est la branche par défaut
 
 # 2. Environnement Python du worker
 cd worker
