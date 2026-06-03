@@ -1,6 +1,6 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-03 (provider vLLM + parallélisation worker + runbook GPU loué — py_compile OK)
+Dernière mise à jour : 2026-06-03 (test 50 sur vLLM + Qwen2.5-32B-AWQ ; script `worker/run_gpu_test.sh` ; staging Vercel)
 
 ## Objectif actuel
 
@@ -36,7 +36,10 @@ Valider la qualité des extractions LLM sur ~50 arrêts réels (30 FR + 20 NL) a
 - **Critères fusionnés FR (`fr_025`, `fr_033`) conservés en l'état jusqu'à validation cliente.**
 - **Corpus prod = 181 802 arrêts** (~1,45M appels LLM) — infaisable sur le laptop (~1-2 ans). Traitement sur **GPU loué à l'heure** (Vast.ai/Runpod), zéro token API, ~15-30 €.
 - **Worker portable Ollama → vLLM** : `VLLMProvider` (API OpenAI-compat, `guided_json` strict) activé par `LLM_PROVIDER=vllm` ; `analyze.py --concurrency N` (ThreadPoolExecutor, 1 client Supabase/thread) pour exploiter le batching vLLM. Défaut `--concurrency 1` = inchangé.
-- **Test 50 arrêts** : tourne sur GPU loué via Ollama (pas besoin de vLLM), ~1-2 €. Runbook complet : [`worker/DEPLOY_GPU.md`](worker/DEPLOY_GPU.md).
+- **Modèle retenu (précision max, priorité non négociable)** : `Qwen/Qwen2.5-32B-Instruct-AWQ` via vLLM — **même modèle pour le test 50 ET la prod** (la validation juridique porte sur ce qui shippera). Le 32B-AWQ pèse ~19 Go : rentre sur un 3090 24 Go (serré, concurrence 2), demande une carte plus grosse (A100) pour le corpus complet. Si le 32B dépasse 30-40 € sur le corpus, repli sur `Qwen2.5-14B-Instruct-AWQ` + refaire le test 50 sur ce modèle.
+- **Test 50 arrêts** : tourne sur **GPU loué via vLLM + Qwen2.5-32B-AWQ** (RTX 3090, ~1-3 €). Script tout-en-un : [`worker/run_gpu_test.sh`](worker/run_gpu_test.sh). Runbook détaillé : [`worker/DEPLOY_GPU.md`](worker/DEPLOY_GPU.md).
+- **Prérequis instance GPU (leçons des échecs de lancement)** : Ubuntu 22.04, **Max CUDA ≥ 12.8** (sinon vLLM 0.22 plante « NVIDIA driver too old »), **disque ≥ 50 Go** (32 Go = trop juste, le téléchargement du modèle ~19 Go avorte et nettoie les fichiers partiels). Arrêter (stop/terminate) l'instance dès le run fini.
+- **Staging Vercel** : app déployée sur https://dimagin-saasjur.vercel.app, domaine custom `dimagin-saasjur.kedo.be` ajouté. ⏳ **Reste côté user** : ajouter l'enregistrement DNS chez LWS (CNAME `cname.vercel-dns.com` ou A `76.76.21.21`) + ajouter les redirect URLs dans Supabase Auth. Seules les vars `NEXT_PUBLIC_*` sont sur Vercel (le `service_role` reste hors Vercel, worker uniquement).
 
 ## Stack retenue
 
@@ -138,41 +141,50 @@ Non traités volontairement (hors périmètre session) : Q1–Q4 et W4–W6 (min
 
 ## Prochaine action exacte
 
-**Repartir d'une DB propre, re-scraper 50 arrêts (30 FR + 20 NL), extraire le texte, analyser, puis valider dans `/validation`.**
+**Lancer le test 50 arrêts sur une instance GPU louée (vLLM + Qwen2.5-32B-AWQ), puis valider dans `/validation` avec l'avocate.** Tout est encapsulé dans [`worker/run_gpu_test.sh`](worker/run_gpu_test.sh).
 
-> ⚠️ Important : en batch, `analyze.py` **sans** `--group` (tous les groupes par arrêt).
-> `fetch_pending_analyze` ignore tout arrêt ayant déjà ≥1 valeur ; enchaîner
-> `--group identity`, `--group metadata`, … remplit tout au 1er groupe puis les
-> suivants ne trouvent plus rien. Le `--group` ne sert qu'au contrôle qualité
-> ciblé sur un seul arrêt (`--arret-id <uuid> --group identity --dry-run`).
+> ⚠️ Avant de louer : vérifier **Max CUDA ≥ 12.8** et **disque ≥ 50 Go** (cf. décisions
+> ci-dessus — les deux causes des échecs de lancement précédents).
 
-```sql
--- 0. Vider la DB (Supabase → SQL Editor). Cascade : supprime segments,
---    extractions, valeurs, jobs, model_runs. Garde criteria / profiles / organisations.
-truncate table arrets cascade;
+```bash
+# Sur une instance Vast.ai fraîche (Ubuntu 22.04, GPU 24 Go, terminal SSH/Jupyter) :
+sudo apt-get update && sudo apt-get install -y python3-venv git curl
+git clone https://github.com/kedoriban/saas-juridique.git
+cd saas-juridique/worker
+
+# Créer le secret À LA RACINE du repo (jamais commité) :
+cat > ../.env.local <<'EOF'
+NEXT_PUBLIC_SUPABASE_URL=https://kuwhvnyvughydcqzjrby.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<ta-cle-service-role>
+EOF
+
+# Tout le pipeline (venv + pip + vLLM serve + scraper + extract + analyze) :
+bash run_gpu_test.sh
 ```
 
-```powershell
-# 1. Scraper 30 FR + 20 NL (depuis worker/, charge ../.env.local)
-cd C:\Projects\saas-juridique-cce-rvv\worker
-.venv\Scripts\activate
-$env:PYTHONIOENCODING="utf-8"; python scraper.py --lang fr --limit 30
-$env:PYTHONIOENCODING="utf-8"; python scraper.py --lang nl --limit 20
+Le script : crée le venv, installe `requirements.txt` + `vllm`, lance
+`vllm serve Qwen/Qwen2.5-32B-Instruct-AWQ --max-model-len 4096 --gpu-memory-utilization 0.95 --max-num-seqs 2 --enforce-eager` en arrière-plan (logs `vllm.log`), attend que le serveur réponde, puis enchaîne `scraper.py --lang fr --limit 30`, `scraper.py --lang nl --limit 20`, `main.py --limit 55`, `analyze.py --limit 50 --concurrency 2`.
 
-# 2. Extraire le texte PDF (statut en_attente → termine)
-$env:PYTHONIOENCODING="utf-8"; python main.py --limit 55
+> ⚠️ En batch, `analyze.py` tourne **sans** `--group` (tous les groupes par arrêt).
+> `fetch_pending_analyze` ignore tout arrêt ayant déjà ≥1 valeur ; enchaîner les
+> `--group` remplirait tout au 1er groupe puis les suivants ne trouveraient plus rien.
+> Le `--group` ne sert qu'au contrôle qualité ciblé (`--arret-id <uuid> --group identity --dry-run`).
 
-# 3. Analyser (Ollama actif). PAS de --group en batch (voir avertissement ci-dessus).
-$env:Path += ";$env:LOCALAPPDATA\Programs\Ollama"   # si Ollama absent du PATH
-$env:PYTHONIOENCODING="utf-8"; python analyze.py --limit 5    # contrôle qualité d'abord
-$env:PYTHONIOENCODING="utf-8"; python analyze.py --limit 50   # le reste (déjà analysés ignorés)
-```
+> Pour repartir d'une DB propre (Supabase → SQL Editor) — cascade : supprime segments,
+> extractions, valeurs, jobs, model_runs ; garde criteria / profiles / organisations :
+> ```sql
+> truncate table arrets cascade;
+> ```
 
 Puis ouvrir `/validation` et valider manuellement un échantillon avec l'avocate.
+**Arrêter (stop/terminate) l'instance GPU dès le run fini** (facture tant qu'elle tourne).
 
 > Compte de démo : le sidebar masque la section Admin (Validation / Critères /
 > Paramètres) si `profiles.role` = `lecteur`. Mettre le compte démo en `admin`
 > ou `avocat` dans la table `profiles`.
+
+> 💻 Dev local (laptop RTX 3050, 4 Go) : provider Ollama par défaut (`qwen3:4b`)
+> pour tests rapides. vLLM + 32B-AWQ est réservé à la machine louée.
 
 ## Correctifs audit — ✅ APPLIQUÉS le 2026-06-03 (prompt d'origine conservé ci-dessous pour archive)
 
