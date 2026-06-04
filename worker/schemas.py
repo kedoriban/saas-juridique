@@ -13,6 +13,7 @@ Statuts canoniques (7) :
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import jsonschema
@@ -96,6 +97,17 @@ def normalize_response(
             item["status"] = STATUS_MAP.get(raw, "not_mentioned")
             if "needs_human_review" not in item:
                 item["needs_human_review"] = item["status"] in _REVIEW_STATUSES
+            # Coerce les valeurs non-string retournées par le LLM (dict, list, int…)
+            # Le schema attend uniquement string | null.
+            val = item.get("value")
+            if isinstance(val, dict):
+                # Ex: {'date_arrivee': None, 'date_introduction_dpi': '7 oct. 2021'}
+                # → sérialiser en JSON (parseValueText() côté frontend le gère)
+                item["value"] = json.dumps(val, ensure_ascii=False)
+            elif isinstance(val, list):
+                item["value"] = ", ".join(str(x) for x in val if x is not None) or None
+            elif val is not None and not isinstance(val, str):
+                item["value"] = str(val)
         return data
 
     # Format plat historique
