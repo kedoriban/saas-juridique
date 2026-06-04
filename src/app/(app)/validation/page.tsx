@@ -2,8 +2,31 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { Arret } from "@/lib/types";
 
+// Procédures considérées comme "asile / protection"
+const ASYLUM_PROCEDURE_TYPES = new Set([
+  "protection_internationale_fond",
+  "unknown",
+]);
+
+function procedureLabel(pt: string | null): { label: string; classes: string } | null {
+  switch (pt) {
+    case "protection_internationale_fond":
+      return { label: "Asile", classes: "bg-green-50 text-green-700" };
+    case "dublin_transfert":
+      return { label: "Dublin", classes: "bg-purple-50 text-purple-700" };
+    case "oqt_extreme_urgence":
+      return { label: "OQT", classes: "bg-orange-50 text-orange-700" };
+    case "sejour_visa_regroupement":
+      return { label: "Séjour", classes: "bg-gray-100 text-gray-500" };
+    case "unknown":
+    case null:
+    default:
+      return null;
+  }
+}
+
 function ProgressBar({ validated, total }: { validated: number; total: number }) {
-  if (total === 0) return <span className="text-xs text-gray-400">Aucune valeur LLM</span>;
+  if (total === 0) return <span className="text-xs text-gray-400">En attente LLM</span>;
   const pct = Math.round((validated / total) * 100);
   return (
     <div className="flex items-center gap-2">
@@ -43,7 +66,13 @@ type ArretWithStats = Arret & {
   incertain: number;
 };
 
-export default async function ValidationPage() {
+type PageProps = { searchParams: Promise<Record<string, string>> };
+
+export default async function ValidationPage({ searchParams }: PageProps) {
+  const sp = await searchParams;
+  // "asile" par défaut — filtre sur les arrêts protection/unknown
+  const filtre: "asile" | "tous" = sp.proc === "tous" ? "tous" : "asile";
+
   const supabase = await createClient();
 
   const { data: arrets } = await supabase
@@ -87,19 +116,24 @@ export default async function ValidationPage() {
     }
   }
 
-  const arretsWithStats: ArretWithStats[] = arretList.map((a) => ({
+  const allWithStats: ArretWithStats[] = arretList.map((a) => ({
     ...a,
     ...(statsMap[a.id] ?? { total: 0, validated: 0, correct: 0, incorrect: 0, incertain: 0 }),
   }));
 
-  // Stats globales
+  const asileCount = allWithStats.filter((a) => ASYLUM_PROCEDURE_TYPES.has(a.procedure_type ?? "unknown")).length;
+
+  const arretsWithStats = filtre === "asile"
+    ? allWithStats.filter((a) => ASYLUM_PROCEDURE_TYPES.has(a.procedure_type ?? "unknown"))
+    : allWithStats;
+
+  // Stats globales sur la sélection affichée
   const totalGlobal = arretsWithStats.reduce((s, a) => s + a.total, 0);
   const validatedGlobal = arretsWithStats.reduce((s, a) => s + a.validated, 0);
   const incorrectGlobal = arretsWithStats.reduce((s, a) => s + a.incorrect, 0);
   const tauxErreur = validatedGlobal > 0 ? Math.round((incorrectGlobal / validatedGlobal) * 100) : null;
-
-  // Arrêts complets = tous critères révisés
   const arretsComplets = arretsWithStats.filter((a) => a.total > 0 && a.validated === a.total).length;
+  const nonAnalyses = arretsWithStats.filter((a) => a.total === 0).length;
 
   return (
     <div className="px-4 lg:px-8 py-6 max-w-5xl">
@@ -108,9 +142,9 @@ export default async function ValidationPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Validation juridique</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {arretList.length} arrêt{arretList.length > 1 ? "s" : ""} analysés
+            {arretsWithStats.length} arrêt{arretsWithStats.length > 1 ? "s" : ""}
             · {validatedGlobal}/{totalGlobal} critères révisés
-            · {arretsComplets} arrêt{arretsComplets > 1 ? "s" : ""} terminé{arretsComplets > 1 ? "s" : ""}
+            · {arretsComplets} terminé{arretsComplets > 1 ? "s" : ""}
             {tauxErreur !== null && (
               <span className={`ml-2 font-medium ${tauxErreur > 20 ? "text-red-600" : "text-green-600"}`}>
                 · {tauxErreur}% incorrects
@@ -128,14 +162,49 @@ export default async function ValidationPage() {
 
       <BlockageBanner />
 
+      {/* Tabs filtre procédure */}
+      <div className="mt-4 flex gap-2">
+        <Link
+          href="/validation?proc=asile"
+          className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+            filtre === "asile"
+              ? "bg-forest-600 text-white"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          Asile / protection
+          <span className="ml-1.5 text-[11px] opacity-75">({asileCount})</span>
+        </Link>
+        <Link
+          href="/validation?proc=tous"
+          className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+            filtre === "tous"
+              ? "bg-forest-600 text-white"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          Tous les arrêts
+          <span className="ml-1.5 text-[11px] opacity-75">({allWithStats.length})</span>
+        </Link>
+      </div>
+
+      {/* Avertissement arrêts non encore analysés */}
+      {nonAnalyses > 0 && (
+        <div className="mt-3 rounded-lg bg-blue-50 border border-blue-200 px-4 py-2.5 text-xs text-blue-800">
+          <strong>{nonAnalyses} arrêt{nonAnalyses > 1 ? "s" : ""}</strong> pas encore analysé{nonAnalyses > 1 ? "s" : ""} par le LLM
+          — lancez <code className="font-mono bg-blue-100 px-1 rounded">analyze.py --limit 23</code> sur le GPU.
+        </div>
+      )}
+
       {/* Tableau desktop */}
-      <div className="mt-5 hidden lg:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="mt-4 hidden lg:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 text-left text-xs text-gray-500 font-semibold uppercase tracking-wide">
               <th className="px-4 py-3">N° Arrêt</th>
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Langue</th>
+              <th className="px-4 py-3">Procédure</th>
               <th className="px-4 py-3 min-w-[160px]">Progression</th>
               <th className="px-4 py-3">Résultats</th>
               <th className="px-4 py-3"></th>
@@ -144,6 +213,8 @@ export default async function ValidationPage() {
           <tbody className="divide-y divide-gray-50">
             {arretsWithStats.map((a) => {
               const done = a.total > 0 && a.validated === a.total;
+              const notAnalyzed = a.total === 0;
+              const proc = procedureLabel(a.procedure_type);
               return (
                 <tr key={a.id} className={`hover:bg-gray-50 transition-colors ${done ? "opacity-60" : ""}`}>
                   <td className="px-4 py-3 font-semibold text-gray-900">{a.numero}</td>
@@ -158,6 +229,15 @@ export default async function ValidationPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
+                    {proc ? (
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${proc.classes}`}>
+                        {proc.label}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-gray-300 font-medium">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
                     <ProgressBar validated={a.validated} total={a.total} />
                   </td>
                   <td className="px-4 py-3">
@@ -168,7 +248,9 @@ export default async function ValidationPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {done ? (
+                    {notAnalyzed ? (
+                      <span className="text-xs text-gray-300">En attente</span>
+                    ) : done ? (
                       <span className="text-xs text-green-600 font-medium">✓ Terminé</span>
                     ) : (
                       <Link
@@ -187,18 +269,25 @@ export default async function ValidationPage() {
       </div>
 
       {/* Cartes mobile */}
-      <div className="mt-5 lg:hidden space-y-3">
+      <div className="mt-4 lg:hidden space-y-3">
         {arretsWithStats.map((a) => {
           const done = a.total > 0 && a.validated === a.total;
+          const notAnalyzed = a.total === 0;
+          const proc = procedureLabel(a.procedure_type);
           return (
             <Link
               key={a.id}
-              href={`/validation/${a.id}`}
-              className={`block bg-white rounded-2xl shadow-sm border border-gray-100 p-4 ${done ? "opacity-60" : ""}`}
+              href={notAnalyzed ? "#" : `/validation/${a.id}`}
+              className={`block bg-white rounded-2xl shadow-sm border border-gray-100 p-4 ${done ? "opacity-60" : ""} ${notAnalyzed ? "pointer-events-none" : ""}`}
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="font-semibold text-gray-900">{a.numero}</span>
                 <div className="flex items-center gap-2">
+                  {proc && (
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${proc.classes}`}>
+                      {proc.label}
+                    </span>
+                  )}
                   <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
                     a.langue === "fr" ? "bg-blue-50 text-blue-700" : "bg-orange-50 text-orange-700"
                   }`}>
