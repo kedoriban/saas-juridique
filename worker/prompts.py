@@ -133,9 +133,10 @@ def select_sections(
     section_ids = GROUP_SECTIONS.get(group, [])
     candidates = intermediate.get_sections_for_criteria_group(section_ids)
 
-    # Fallback : si aucune section ne correspond (noms inconnus), tout prendre
+    # Pas de fallback : si aucune section ne correspond au groupe, retourner []
+    # → analyze_group affichera [SKIP] au lieu de passer du texte hors-sujet au LLM.
     if not candidates:
-        candidates = list(intermediate.sections)
+        return []
 
     result: list[SectionEntry] = []
     total = 0

@@ -155,6 +155,10 @@ def validate_response(
         )
 
     if not data.get("items"):
-        errors.append(f"Aucun item valide pour le groupe '{group}'")
+        # Pas d'erreur bloquante : le LLM n'a rien trouvé (sections absentes ou hors-sujet).
+        # On stocke 0 valeurs sans retenter — le retry ne changerait rien.
+        data.setdefault("warnings", []).append(
+            f"Aucun item retourné pour le groupe '{group}' — sections peut-être absentes"
+        )
 
     return errors
