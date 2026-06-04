@@ -23,6 +23,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -194,10 +195,20 @@ def process_arret(
     print(f"  Interméd. : {cache_path}")
 
     if not dry_run:
-        store_extraction(client, arret_id, result)
-        store_segments(client, arret_id, segments)
-        store_intermediate_data(client, arret_id, intermediate)
-        mark_done(client, arret_id, success=True)
+        import httpx
+
+        def _do_stores(c) -> None:
+            store_extraction(c, arret_id, result)
+            store_segments(c, arret_id, segments)
+            store_intermediate_data(c, arret_id, intermediate)
+            mark_done(c, arret_id, success=True)
+
+        try:
+            _do_stores(client)
+        except (httpx.WriteError, httpx.ReadError, httpx.ConnectError, httpx.RemoteProtocolError) as exc:
+            print(f"  [réseau] {exc.__class__.__name__} — reconnexion et retry…")
+            time.sleep(1.5)
+            _do_stores(_get_supabase_client())
         print(f"  -> OK (stocké)")
     else:
         print(f"  -> OK (dry-run, rien stocké)")
@@ -229,6 +240,8 @@ def run_batch(limit: int, dry_run: bool) -> None:
     print(f"{len(arrets)} arrêt(s) à traiter (limite={limit}, dry_run={dry_run})")
     ok = 0
     for arret in arrets:
+        # Nouvelle connexion par arrêt : évite les Broken pipe sur connexion HTTP/2 idle
+        client = _get_supabase_client()
         success = process_arret(
             arret_id=arret["id"],
             pdf_url=arret.get("pdf_url") or "",
