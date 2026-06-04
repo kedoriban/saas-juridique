@@ -17,6 +17,9 @@ WORKER="$WORKDIR/worker"
 LOG_DIR="$WORKDIR/logs"
 ENV_FILE="$WORKDIR/.env.local"
 
+# Créer le dossier logs en tout premier (avant tout redirect externe)
+mkdir -p "$LOG_DIR"
+
 VLLM_MODEL="Qwen/Qwen2.5-32B-Instruct-AWQ"
 VLLM_PORT="${VLLM_PORT:-8000}"
 EXTRACT_LIMIT="${EXTRACT_LIMIT:-55}"
@@ -42,18 +45,19 @@ if [ ! -d "$WORKER/.venv" ]; then
 fi
 
 cd "$WORKER"
+PYTHON="$WORKER/.venv/bin/python"
 
 # --- 1. Lancer vLLM en arrière-plan ---
 echo ""
 echo "[1/3] Démarrage vLLM ($VLLM_MODEL)..."
 echo "      Log → $LOG_DIR/vllm.log"
 
-nohup .venv/bin/python -m vllm.entrypoints.openai.api_server \
+nohup "$WORKER/.venv/bin/python" -m vllm.entrypoints.openai.api_server \
   --model "$VLLM_MODEL" \
   --port "$VLLM_PORT" \
   --dtype auto \
-  --max-model-len 8192 \
-  --gpu-memory-utilization 0.92 \
+  --max-model-len 5500 \
+  --gpu-memory-utilization 0.9825 \
   --trust-remote-code \
   > "$LOG_DIR/vllm.log" 2>&1 &
 
@@ -90,8 +94,8 @@ export LLM_PROVIDER="vllm"
 export VLLM_BASE_URL="http://localhost:${VLLM_PORT}/v1"
 export VLLM_MODEL="$VLLM_MODEL"
 export LLM_TIMEOUT_SECONDS="300"
-export LLM_MAX_INPUT_CHARS="16000"
-export LLM_MAX_OUTPUT_TOKENS="4000"
+export LLM_MAX_INPUT_CHARS="8000"
+export LLM_MAX_OUTPUT_TOKENS="2000"
 export LLM_STORE_RAW_OUTPUT="false"
 export PYTHONIOENCODING="utf-8"
 
@@ -101,7 +105,7 @@ echo "[3a/3] Extraction PDF — main.py --limit $EXTRACT_LIMIT"
 echo "       Log → $LOG_DIR/main.log"
 echo "       Démarré à $(date '+%H:%M:%S')"
 
-.venv/bin/python main.py --limit "$EXTRACT_LIMIT" 2>&1 | tee "$LOG_DIR/main.log"
+"$PYTHON" main.py --limit "$EXTRACT_LIMIT" 2>&1 | tee "$LOG_DIR/main.log"
 
 echo "       Terminé à $(date '+%H:%M:%S')"
 
@@ -111,7 +115,7 @@ echo "[3b/3] Analyse LLM — analyze.py --limit $ANALYZE_LIMIT"
 echo "       Log → $LOG_DIR/analyze.log"
 echo "       Démarré à $(date '+%H:%M:%S')"
 
-.venv/bin/python analyze.py --limit "$ANALYZE_LIMIT" 2>&1 | tee "$LOG_DIR/analyze.log"
+"$PYTHON" analyze.py --limit "$ANALYZE_LIMIT" 2>&1 | tee "$LOG_DIR/analyze.log"
 
 echo "       Terminé à $(date '+%H:%M:%S')"
 

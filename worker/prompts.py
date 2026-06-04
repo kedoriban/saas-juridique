@@ -17,14 +17,14 @@ from dataclasses import replace
 
 from build_intermediate import IntermediateDocument, SectionEntry
 
-MAX_PASSAGE_CHARS = 5000
+MAX_PASSAGE_CHARS = 6500
 
 # Mapping groupe → section_ids prioritaires (ordre de pertinence).
 # Inclut les anciens noms (fallback arrêts pré-Phase-1) ET les nouveaux.
 GROUP_SECTIONS: dict[str, list[str]] = {
     "metadata": [
-        # Nouveaux (Phase 1)
-        "faits_invokes", "feitenrelaas",
+        # Sections structurelles FR (nouvelles + fixes)
+        "corps_arret", "faits_invokes", "feitenrelaas",
         "acte_attaque", "bestreden_beslissing",
         "cadre_juridique", "juridisch_kader",
         "dispositif", "dictum",
@@ -34,6 +34,8 @@ GROUP_SECTIONS: dict[str, list[str]] = {
     "procedure": [
         "cadre_juridique", "juridisch_kader",
         "acte_attaque", "bestreden_beslissing",
+        "corps_arret", "corps_uitspraak",
+        "en_droit", "in_rechte",
         "extreme_urgence", "uiterst_dringende_noodzakelijkheid",
         "jonction_affaires", "samenvoeging_zaken",
         "non_comparution",
@@ -41,12 +43,14 @@ GROUP_SECTIONS: dict[str, list[str]] = {
     ],
     "identity": [
         "faits_invokes", "feitenrelaas",
+        "corps_arret", "corps_uitspraak",
         "these_partie_requerante", "standpunt_verzoekende_partij",
         "acte_attaque", "bestreden_beslissing",
         "identite", "faits", "procedure",
     ],
     "profile_vulnerability": [
         "faits_invokes", "feitenrelaas",
+        "corps_arret", "corps_uitspraak",
         "these_partie_requerante", "standpunt_verzoekende_partij",
         "motivation_cgra_ou_oe", "motivering_cgvs_of_dv",
         "faits", "identite", "arguments", "credibilite",
@@ -56,14 +60,17 @@ GROUP_SECTIONS: dict[str, list[str]] = {
         "article_3_cedh", "artikel_3_evrm",
         "article_8_cedh", "artikel_8_evrm",
         "appreciation_48_3", "appreciation_48_4",
+        "appreciation_generale", "en_droit", "in_rechte",
         "beoordeling_vluchtelingenstatus",
         "beoordeling_subsidiaire_bescherming",
         "beoordeling",
+        "motivation_cgra_ou_oe", "motivering_cgvs_of_dv",
         "dispositif", "dictum",
         "analyse", "credibilite", "arguments",
     ],
     "persecution_claims": [
         "faits_invokes", "feitenrelaas",
+        "corps_arret", "corps_uitspraak",
         "these_partie_requerante", "standpunt_verzoekende_partij",
         "motivation_cgra_ou_oe", "motivering_cgvs_of_dv",
         "nouveaux_elements", "nieuwe_elementen",
@@ -74,12 +81,15 @@ GROUP_SECTIONS: dict[str, list[str]] = {
         "conclusion_cgra_ou_oe", "conclusie_cgvs_of_dv",
         "nouveaux_elements", "nieuwe_elementen",
         "faits_invokes", "feitenrelaas",
+        "corps_arret", "corps_uitspraak",
         "documents", "analyse",
     ],
     "general": [
         "faits_invokes", "feitenrelaas",
+        "corps_arret", "corps_uitspraak",
         "these_partie_requerante", "standpunt_verzoekende_partij",
         "article_48_7", "artikel_48_7",
+        "en_droit", "appreciation_generale",
         "dispositif", "dictum",
         "faits", "analyse",
     ],

@@ -66,13 +66,21 @@ _SECTIONS_FR: list[SectionDef] = [
                _p(r"(?:\d+\.\s*)?jonction\s+des\s+affaires")),
     SectionDef("acte_attaque",     "CGRA",
                _p(r"(?:\d+\.\s*|[a-z]\.\s*)?(?:l['']acte\s+attaqu[eé]|d[eé]cision\s+attaqu[eé]e)")),
-    # Sections structurelles principales
+    # Délimiteur de début de corps (REND L'ARRET SUIVANT)
+    SectionDef("corps_arret",      "CCE",
+               _p(r"apr[eè]s\s+en\s+avoir\s+d[eé]lib[eé]r[eé],?\s*rend\s+l.{0,6}arr[eê]t\s+suivant")),
+    # Sections structurelles principales — préfixe numérique (\d+.) ou lettre (A.) ou rien
     SectionDef("faits_invokes",    "CGRA",
-               _p(r"(?:[A-Z]\.\s*)?(?:faits\s+invoqu[eé]s|les\s+faits)$")),
+               _p(r"(?:\d+\.\s*|[A-Z]\.\s*)?(?:les\s+)?faits\s+(?:pertinents\s+)?(?:de\s+la\s+cause|invoqu[eé]s)[.:]?$")),
     SectionDef("motivation_cgra_ou_oe", "CGRA",
-               _p(r"(?:[A-Z]\.\s*)?motivation$")),
+               _p(r"(?:\d+\.\s*|[A-Z]\.\s*)?motivation[.:]?$")),
     SectionDef("conclusion_cgra_ou_oe", "CGRA",
-               _p(r"(?:[A-Z]\.\s*)?conclusion$")),
+               _p(r"(?:\d+\.\s*|[A-Z]\.\s*)?conclusion[.:]?$")),
+    # En droit / Appréciation CCE (sections non-asile et sections CCE génériques)
+    SectionDef("en_droit",         "CCE",
+               _p(r"(?:\d+\.\s*)?en\s+droit[.:]?$")),
+    SectionDef("appreciation_generale", "CCE",
+               _p(r"(?:\d+\.\s*)?appr[eé]ciation(?:\s+(?:g[eé]n[eé]rale|du\s+conseil|de\s+la\s+demande))?[.:]?$")),
     SectionDef("cadre_juridique",  "CCE",
                _p(r"(?:\d+\.\s*)?(?:le\s+)?cadre\s+juridique(?:\s+de\s+l['']examen)?")),
     SectionDef("nouveaux_elements","CCE",
@@ -107,13 +115,18 @@ _SECTIONS_NL: list[SectionDef] = [
                _p(r"(?:\d+\.\s*)?samenvoeging\s+van\s+de\s+zaken")),
     SectionDef("bestreden_beslissing","CGVS",
                _p(r"(?:\d+\.\s*|[a-z]\.\s*)?de\s+bestreden\s+beslissing")),
-    # Sections structurelles principales
+    # Délimiteur de début de corps (NA BERAADSLAGING)
+    SectionDef("corps_uitspraak",  "RvV",
+               _p(r"na\s+beraadslaging.*geeft\s+de\s+volgende\s+uitspraak")),
+    # Sections structurelles principales — préfixe numérique ou lettre
     SectionDef("feitenrelaas",    "CGVS",
-               _p(r"(?:\d+\.\s*)?(?:de\s+)?feitenrelaas$")),
+               _p(r"(?:\d+\.\s*|[A-Z]\.\s*)?(?:de\s+)?(?:feiten(?:relaas)?|relevante\s+feiten\s+van\s+(?:de\s+zaak|het\s+geval))[.:]?$")),
     SectionDef("motivering_cgvs_of_dv", "CGVS",
-               _p(r"(?:[A-Z]\.\s*)?motivering$")),
+               _p(r"(?:\d+\.\s*|[A-Z]\.\s*)?motivering[.:]?$")),
     SectionDef("conclusie_cgvs_of_dv", "CGVS",
-               _p(r"(?:[A-Z]\.\s*)?conclusie$")),
+               _p(r"(?:\d+\.\s*|[A-Z]\.\s*)?conclusie[.:]?$")),
+    SectionDef("in_rechte",       "RvV",
+               _p(r"(?:\d+\.\s*)?in\s+rechte[.:]?$")),
     SectionDef("juridisch_kader", "RvV",
                _p(r"(?:\d+\.\s*)?(?:het\s+)?juridisch\s+kader(?:\s+van\s+het\s+onderzoek)?")),
     SectionDef("nieuwe_elementen","RvV",
