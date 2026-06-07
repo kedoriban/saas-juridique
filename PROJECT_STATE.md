@@ -949,14 +949,73 @@ fr_005_chambres_fr_cce_ou_nl_cvv: 'IIIème CHAMBRE' (status=found, conf=0.95) �
 
 ## Prochaine action exacte
 
-**R-Phase 5 — Phase 4 : validation complète 72B sur Vast.ai (8 arrêts de référence)**
+**R-Phase 5 — Phase 5 : améliorer couverture DPI (46% → 65%)**
 
-### Objectif
-Lancer `analyze_reference.py` (tous groupes) avec Qwen2.5-72B-AWQ sur A100 80 Go,
-comparer les résultats vs `RESULTAT ATTENDU.md` via `score_reference.py`.
-Décision : les seuils ci-dessous ≥ atteints → relecture avocate autorisée.
+Seuils non atteints après Phase 4. Prochains axes :
+1. `profile_vulnerability` DPI : score 9/15 sur 341946 — investiguer quels critères manquent (not_applicable vs not_mentioned)
+2. `evidence_documents` COI cités : vide sauf 341946 — vérifier `fr_047` dans le groupe
+3. `fr_006` date arrivée/DPI manquante sur tous les arrêts (metadata 6/7)
+4. Relance identique sur Vast.ai quand instance dispo (ré-utiliser séquence Phase 4)
 
-### Score baseline actuel (2026-06-07 — metadata R-Phase 5 + autres groupes R-Phase 4)
+---
+
+## R-Phase 5 — Phase 4 — Bilan (2026-06-07)
+
+### Résultats analyse 72B Phase 4 (corrections Phase 3 appliquées)
+
+| Arrêt | Total | Méta | Ident | Décis | Profil | Perséc | Docs |
+|---|---|---|---|---|---|---|---|
+| CCE 341946 (DPI) | 26/48 54% | 6/7 85% | 5/9 55% | 4/8 50% | 9/15 60% | 1/2 50% | 1/1 100% |
+| CCE 341949 (non-DPI) | 8/48 16% | 6/7 85% | 2/9 22% | 0/8 0% | 0/15 0% | 0/2 0% | 0/1 0% |
+| CCE 341951 (non-DPI) | 8/48 16% | 5/7 71% | 1/9 11% | 0/8 0% | 2/15 13% | 0/2 0% | 0/1 0% |
+| CCE 341960 (DPI) | 18/48 37% | 6/7 85% | 4/9 44% | 4/8 50% | 4/15 26% | 0/2 0% | 0/1 0% |
+| CCE 341962 (DPI) | 24/48 50% | 6/7 85% | 7/9 77% | 4/8 50% | 5/15 33% | 0/2 0% | 0/1 0% |
+| CCE 341963 (non-DPI) | 10/48 20% | 5/7 71% | 1/9 11% | 0/8 0% | 4/15 26% | 0/2 0% | 0/1 0% |
+| RvV 342046 (DPI NL) | 21/48 43% | 6/7 85% | 7/11 63% | 5/9 55% | 3/13 23% | 0/1 0% | 0/1 0% |
+| RvV 342062 (non-DPI NL) | 16/48 33% | 6/7 85% | 4/11 36% | 3/9 33% | 2/13 15% | 0/1 0% | 0/1 0% |
+| **TOTAL** | **131/384 34%** | | | | | | |
+
+### Ce qui a été amélioré vs baseline Phase 3 (120/384 = 31%)
+
+| Améliorations | Détail |
+|---|---|
+| Juge NL | V. HOEFNAGELS / V. SERBRUYNS ✅ (était "wnd. voorzitter") |
+| Motivation CCE/RvV | Remplie sur 4/4 DPI (était 0/8 avant Fix 2) |
+| Crédibilité | Remplie sur 341946, 341960, 341962, 342046 |
+| Nationalité | Burundaise / Guinéenne / Sénégalaise / Russe / Afghane ✅ |
+| 342046 NL | 12→21 valeurs (+75%) — identity 0→7/11 |
+
+### Seuils de validation avocate
+
+| Critère | Seuil | Valeur | État |
+|---|---|---|---|
+| Couverture DPI (341946, 341960, 341962, 342046) | ≥ 65% | 46% | ❌ |
+| Metadata | ≥ 90% | 85% | ❌ |
+| Motivation CCE ≥ 2/4 DPI | ≥ 2/4 | 4/4 | ✅ |
+| profile_vulnerability DPI | ≥ 13/15 | 9/15 | ❌ |
+
+### Fixes techniques appliqués en Phase 4
+
+| Fix | Fichier | Problème | Solution |
+|---|---|---|---|
+| prefilling retiré | `worker/llm_provider.py` | `{"items":[` + `guided_json` → 400 Bad Request vLLM | Supprimer le message assistant prefillé (guided_json seul suffit) |
+| max-model-len 16384 | config vLLM | input_tokens (6641) + max_tokens (4096) > max_model_len (8192) → 400 | Démarrer vLLM avec `--max-model-len 16384` (pas 8192) |
+| IDs critères corrigés | `worker/score_reference.py` | KEY_CRITERIA utilisait fr_007/fr_021/fr_025… (décalage ~4) | Corriger avec les vrais IDs : fr_009, fr_037, fr_043… |
+| EngineCore zombie | instance Vast.ai | `kill -9` laisse l'EngineCore vivant (PID 1260) → GPU occupé | `ps aux | grep VLLM` → kill explicite PID EngineCore |
+
+### Commande vLLM validée Phase 4 (A100-SXM4-80GB, CUDA 13.2)
+
+```bash
+nohup /workspace/saas-juridique/worker/.venv/bin/python -m vllm.entrypoints.openai.api_server \
+  --model Qwen/Qwen2.5-72B-Instruct-AWQ \
+  --port 8000 --dtype auto \
+  --max-model-len 16384 \
+  --gpu-memory-utilization 0.92 --trust-remote-code \
+  --enforce-eager \
+  > /workspace/saas-juridique/logs/vllm.log 2>&1 &
+```
+
+### Score baseline Phase 4 (REMPLACE le précédent)
 
 | Arrêt | Total | Méta | Ident | Décis | Profil | Perséc | Docs |
 |---|---|---|---|---|---|---|---|

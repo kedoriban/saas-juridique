@@ -275,9 +275,8 @@ class VLLMProvider(LLMProvider):
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": user_prompt})
-        # Prefilling : même technique que OllamaProvider — force la structure JSON
-        # dès le premier token, réduit la latence et les tokens de sortie.
-        messages.append({"role": "assistant", "content": '{"items":['})
+        # Note: pas de prefilling assistant ici — conflit avec guided_json sur vLLM.
+        # guided_json seul suffit à contraindre la structure JSON de sortie.
 
         payload: dict[str, Any] = {
             "model": self.model,
@@ -328,8 +327,7 @@ class VLLMProvider(LLMProvider):
                 error=f"Reponse vLLM inattendue : {exc}",
             )
 
-        # Reconstituer la réponse complète avec le prefilling injecté
-        raw_text = '{"items":[' + content
+        raw_text = content
 
         # Token usage (disponible dans les réponses vLLM)
         usage = data.get("usage") or {}
