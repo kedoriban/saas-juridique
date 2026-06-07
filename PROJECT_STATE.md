@@ -1,16 +1,17 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-07 (R-Phase 5 Phase 3 — analyse audits + corrections prompts/analyze)
+Dernière mise à jour : 2026-06-08 (R-Phase 5 Phase 4 — analyse complète 72B, score 34%)
 
 ## Objectifs en cours
 
-1. **R-Phase 5 — Phase 3 : validation des corrections** — Relancer `analyze_reference.py` sur les 8 arrêts de référence (groupes `metadata` + `decision_reasoning` + `identity`) pour mesurer l'amélioration vs les anciens audits. Régénérer les fichiers audit_*.txt et comparer.
-2. **Scraper CCE 290647** — Absent de la base (arrêt ~2020), à scraper séparément avant de compléter les 9 arrêts de référence.
-3. **Validation avocate** — Faire relire les arrêts analysés avant tout traitement massif.
-4. ~~R-Phase 5 Phase 3 corrections~~ — **Faites** (2026-06-07) : 8 bugs identifiés, 6 corrections appliquées dans `prompts.py` et `analyze.py`. Validé en dry-run (numéro 341963 → correct).
-5. ~~R-Phase 5 Phase 2~~ — **Terminée** (2026-06-07) : 4 fixes worker + 8/8 metadata stockés + 8 fichiers audit générés.
-6. ~~R-Phase 5 Phase 1~~ — **Terminée** (2026-06-07) : Fix 1 header + Fix 2 regex injection + extract_metadata amélioré + llm_group NL corrigé en base.
-7. ~~R-Phase 4~~ — **Terminée** (2026-06-07) : 72B sur A100 80 Go, ~48 valeurs/arrêt, profile_vulnerability 15/15.
+1. **R-Phase 5 — Phase 5 : améliorer score global 34% → 90%** — Instance Vast.ai conservée, vLLM opérationnel. Axes : profile_vulnerability DPI (9→14/15), Art. 48/7, COI cités, non-DPI not_applicable.
+2. **Validation avocate** — Autorisée uniquement à ≥ 90% global.
+3. **Scraper CCE 290647** — Absent de la base (arrêt ~2020), hors périmètre immédiat.
+4. ~~R-Phase 5 Phase 4~~ — **Terminée** (2026-06-08) : 8/8 arrêts analysés 72B, score 131/384 = 34%.
+5. ~~R-Phase 5 Phase 3~~ — **Terminée** (2026-06-07) : 8 bugs identifiés + 6 corrections prompts/analyze.
+6. ~~R-Phase 5 Phase 2~~ — **Terminée** (2026-06-07) : 4 fixes worker + 8/8 metadata stockés.
+7. ~~R-Phase 5 Phase 1~~ — **Terminée** (2026-06-07) : Fix header + regex injection + metadata amélioré.
+8. ~~R-Phase 4~~ — **Terminée** (2026-06-07) : 72B sur A100 80 Go, ~48 valeurs/arrêt.
 
 ---
 
@@ -949,13 +950,95 @@ fr_005_chambres_fr_cce_ou_nl_cvv: 'IIIème CHAMBRE' (status=found, conf=0.95) �
 
 ## Prochaine action exacte
 
-**R-Phase 5 — Phase 5 : améliorer couverture DPI (46% → 65%)**
+**R-Phase 5 — Phase 5 : score 34% → 90% (instance Vast.ai conservée)**
 
-Seuils non atteints après Phase 4. Prochains axes :
-1. `profile_vulnerability` DPI : score 9/15 sur 341946 — investiguer quels critères manquent (not_applicable vs not_mentioned)
-2. `evidence_documents` COI cités : vide sauf 341946 — vérifier `fr_047` dans le groupe
-3. `fr_006` date arrivée/DPI manquante sur tous les arrêts (metadata 6/7)
-4. Relance identique sur Vast.ai quand instance dispo (ré-utiliser séquence Phase 4)
+### Instance Vast.ai active
+
+```
+ssh -p 18823 root@202.122.49.242 -L 8080:localhost:8080
+```
+
+- vLLM démarré (PID 4167, peut avoir quitté entre sessions — voir "Relancer vLLM" ci-dessous)
+- Fichiers R-Phase 5 déjà transférés par SCP (pas de git pull nécessaire)
+- Commits locaux non pushés sur GitHub → utiliser SCP pour transférer les nouvelles versions
+
+### Diagnostic des gaps (pour atteindre 90%)
+
+**Score actuel : 131/384 = 34%**
+
+| Gap | Impact estimé | Cause probable | Piste |
+|---|---|---|---|
+| Non-DPI : critères DPI marqués ABSENT | ~80 pts | LLM retourne `not_applicable` sans valeur → `has_value=False` | Compter not_applicable comme "couvert" dans score_reference.py |
+| `profile_vulnerability` DPI : 9/15 (était 14/15 en R-Phase 3) | ~20 pts | Retrait prefilling → LLM utilise status=not_applicable pour les critères gender-specific d'un requérant homme | Vérifier audit_arret.py 341946, groupe profile_vulnerability |
+| `persecution_claims` Art. 48/7 : 0/2 | ~16 pts | Groupe `persecution_claims` avec sections correctes ? | Vérifier GROUP_SECTIONS["persecution_claims"] dans prompts.py |
+| `evidence_documents` COI : 0/1 sur 7/8 | ~7 pts | fr_047 dans groupe evidence_documents, section acte_attaque en première position (fix Phase 3) | Relancer dry-run un arrêt DPI sur ce groupe |
+
+### Plan Phase 5 — séquence d'investigation
+
+**Étape 1 — Vérifier/relancer vLLM**
+```bash
+ssh -p 18823 root@202.122.49.242
+ps aux | grep VLLM  # vérifier EngineCore vivant
+# Si mort → relancer :
+nohup /workspace/saas-juridique/worker/.venv/bin/python -m vllm.entrypoints.openai.api_server \
+  --model Qwen/Qwen2.5-72B-Instruct-AWQ \
+  --port 8000 --dtype auto --max-model-len 16384 \
+  --gpu-memory-utilization 0.92 --trust-remote-code --enforce-eager \
+  > /workspace/saas-juridique/logs/vllm.log 2>&1 &
+# Attendre "Application startup complete" (~2 min)
+```
+
+**Étape 2 — Investiguer profile_vulnerability sur 341946**
+```bash
+.venv/bin/python audit_arret.py 341946 2>&1 | grep -A2 'profile_vuln\|fr_02\|fr_03'
+# Identifier quels 6 critères sont vides (sur 15)
+# Comparer avec R-Phase 3 : était 14/15, maintenant 9/15 après retrait prefilling
+```
+
+**Étape 3 — Dry-run persecution_claims sur 341946**
+```bash
+.venv/bin/python analyze.py --arret-id 0fd55631-00d4-433c-b599-5fbb75692d16 --group persecution_claims --dry-run
+# Vérifier si fr_038 (Art. 48/7) est extrait
+```
+
+**Étape 4 — Dry-run evidence_documents sur 341960 (DPI)**
+```bash
+.venv/bin/python analyze.py --arret-id 464635d4-0f8b-4b98-a408-6b5f674ac249 --group evidence_documents --dry-run
+# Vérifier fr_047 COI cités
+```
+
+**Étape 5 — Corriger score_reference.py : compter not_applicable comme couvert**
+```python
+# Dans has_value(), ajouter check sur status ou value stockée
+# OU vérifier si les not_applicable sont réellement en DB avec value_text="not_applicable"
+```
+
+**Étape 6 — Après corrections → relancer analyze_reference.py + score**
+```bash
+PYTHONIOENCODING=utf-8 PYTHONUNBUFFERED=1 .venv/bin/python analyze_reference.py 2>&1 | tee logs/analyze_reference_v2.log
+.venv/bin/python score_reference.py --verbose
+```
+
+### UUIDs des 8 arrêts de référence
+
+| Arrêt | UUID |
+|---|---|
+| CCE 341946 fr | 0fd55631-00d4-433c-b599-5fbb75692d16 |
+| CCE 341949 fr | e62bfb49-8e15-45f9-95d5-2c558c2571d4 |
+| CCE 341951 fr | b3adae70-1776-4c6c-846f-0d0776ae742b |
+| CCE 341960 fr | 464635d4-0f8b-4b98-a408-6b5f674ac249 |
+| CCE 341962 fr | 02552ae3-ae24-40ed-9918-98a5e69f0f16 |
+| CCE 341963 fr | 6f490a37-224c-4b96-92e9-97b740ede7c4 |
+| RvV 342046 nl | 08e588e6-62dc-4c41-adc8-d0fd5dd965e6 |
+| RvV 342062 nl | ff586b0e-0ca2-4c40-b3ca-f0dac25811d8 |
+
+### Points de vigilance Phase 5
+
+- **Commits locaux non pushés** → toujours utiliser SCP pour transférer les fichiers modifiés vers l'instance
+- **`kill -9 vLLM`** ne suffit pas — tuer aussi `VLLM::EngineCore` (ps aux | grep VLLM) sinon GPU reste occupé
+- **`has_value` dans score_reference.py** peut sous-estimer le score réel si not_applicable ≠ NULL en DB
+- **profile_vulnerability regression** : R-Phase 3 avait 14/15 (avec prefilling), R-Phase 5 Phase 4 a 9/15 (sans prefilling + max-model-len 16384) — le retrait du prefilling peut avoir changé la structure de réponse
+- **Objectif avocate** : ≥ 90% global (346/384) — ne pas envoyer avant ce seuil
 
 ---
 
