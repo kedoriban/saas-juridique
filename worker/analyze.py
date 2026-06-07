@@ -185,7 +185,7 @@ def store_criteria_values(
             "confidence":         item.get("confidence"),
             "evidence_excerpt":   item.get("evidence_excerpt"),
             "model_run_id":       model_run_id,
-            "source_authority":   item.get("source_authority"),
+            "source_authority":   (item.get("source_authority") or "").upper() or None,
             "source_section":     item.get("source_section"),
             "needs_human_review": item.get("needs_human_review", False),
         })
