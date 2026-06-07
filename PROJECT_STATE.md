@@ -1,12 +1,12 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-07 (UI-Phase D terminée + worker amélioré R-Phase 4)
+Dernière mise à jour : 2026-06-07 (R-Phase 4 terminée + audit qualité worker)
 
 ## Objectifs en cours
 
-1. **R-Phase 4** — Test 50 arrêts avec Qwen2.5-72B-Instruct-AWQ sur A100 80 Go (Vast.ai). Prêt à lancer — worker amélioré committé.
+1. **R-Phase 5 — Amélioration extraction** — Audit complet du worker + correction des prompts sur la base des PDF réels fournis par la cliente + résultats attendus.
 2. **Validation avocate** — Faire relire les 50 arrêts analysés avant tout traitement massif.
-3. ~~UI-Phase D~~ — **Terminée** (2026-06-07).
+3. ~~R-Phase 4~~ — **Terminée** (2026-06-07) : 72B sur A100 80 Go, ~48 valeurs/arrêt, profile_vulnerability 15/15.
 
 ---
 
@@ -135,6 +135,69 @@ sb.table("model_runs").delete().neq("id", "00000000-0000-0000-0000-000000000000"
 print("Valeurs LLM vidées. Les 50 arrêts extraits sont conservés.")
 EOF
 ```
+
+---
+
+---
+
+## R-Phase 4 — Bilan (2026-06-07)
+
+### Résultats
+
+- **Instance Vast.ai** : A100 PCIe 80 Go, CUDA 13.2, PyTorch 2.9.0+cu128, vLLM 0.11.2
+- **Modèle** : `Qwen/Qwen2.5-72B-Instruct-AWQ`
+- **Arrêts analysés** : 48/50 avec succès (~48 valeurs/arrêt)
+- **`profile_vulnerability`** : 15/15 critères consistant (amélioration vs 32B)
+- **Temps/arrêt** : ~200–370s (mode `--enforce-eager`, plus lent que prévu)
+
+### Problèmes rencontrés et solutions
+
+| Problème | Cause | Solution |
+|---|---|---|
+| vLLM crash CUDA graph | `VLLM_ATTENTION_BACKEND=XFORMERS` incompatible A100 | Retirer XFORMERS, laisser auto |
+| `--enforce-eager` obligatoire | Crash kernel `unified_attention` en mode compilé | Flag `--enforce-eager` ajouté |
+| `source_authority` casse mixte | LLM retourne "CGRa" au lieu de "CGRA" | Normalisé en `.upper()` dans `analyze.py` (commit `8913bcf`) |
+| model_runs orphelins | Requête Supabase limitée à 1000 lignes → nettoyage incomplet | Pagination avec `.range()` dans les scripts de cleanup |
+| 2 arrêts sans valeurs | Contrainte SQL violée (`acv_source_authority_check`) | Corrigé par la normalisation uppercase |
+
+### Commande vLLM validée pour A100 80 Go (CUDA 13.2)
+
+```bash
+nohup /workspace/saas-juridique/worker/.venv/bin/python -m vllm.entrypoints.openai.api_server \
+  --model Qwen/Qwen2.5-72B-Instruct-AWQ \
+  --port 8000 --dtype auto \
+  --max-model-len 8192 --gpu-memory-utilization 0.92 --trust-remote-code \
+  --enforce-eager \
+  > /workspace/saas-juridique/logs/vllm.log 2>&1 &
+```
+
+Note : sans `VLLM_ATTENTION_BACKEND=XFORMERS` (contrairement à l'instance RTX 3090).
+
+### Audit qualité (CCE 341995)
+
+Script `worker/audit_arret.py` créé — compare `intermediate_json` vs `arret_criteria_values`.
+
+**Problèmes identifiés :**
+
+| Critère | Dans le texte | LLM | Cause probable |
+|---|---|---|---|
+| Date de l'arrêt | ✅ "27 février 2026" | VIDE | Anonymisation X dans header confond le LLM |
+| Numéro de l'arrêt | ✅ "n° 341 995" | VIDE | Idem |
+| Juge | ✅ "S. SEGHIN" (dispositif) | VIDE | Section dispositif peut-être non transmise au groupe metadata |
+| Avocat | ✅ "Bob BRIJS" | VIDE | Idem header anonymisé |
+| Chambre | ✅ "Xème CHAMBRE" | VIDE | Idem |
+| Crédibilité | ✅ présent | ABSENT | Groupe decision_reasoning non mappé ? |
+| Art. 48/7 | À vérifier | ABSENT | À clarifier avec l'avocate |
+
+**Ce qui fonctionne bien :**
+- Nationalité, ethnie, religion → conf 1.00
+- Motivation CGRA/CCE → conf 0.85
+- COI cités → conf 0.95
+- Persécutions invoquées → OK
+
+### Prochaine action : R-Phase 5
+
+Voir section "Prochaine action exacte" ci-dessous.
 
 ---
 
@@ -452,7 +515,8 @@ Migration 009 (20 min)
 | R-Phase 1. Préprocesseur renforcé | ✅ Terminé | 7 modules + migration 007 appliquée |
 | R-Phase 2. Analyse LLM JSON intermédiaire | ✅ Terminé | analyze.py + prompts.py + schemas.py + build_intermediate.py + migration 008 |
 | R-Phase 3. Test Qwen2.5-32B / RTX 3090 | ✅ **Terminé** | 50 arrêts analysés. Bugs corrigés. ~47 valeurs/arrêt asile. |
-| **R-Phase 4. Test Qwen2.5-72B / A100 80 Go** | 🔄 En cours | 2 instances échouées. Prochaine instance : VRAM ≥ 79 Go. |
+| **R-Phase 4. Test Qwen2.5-72B / A100 80 Go** | ✅ **Terminé** | 48/50 arrêts, 72B validé, --enforce-eager, source_authority fix |
+| **R-Phase 5. Amélioration extraction prompts** | 🔴 À faire | Audit worker + PDF référence + résultats attendus → correction prompts |
 | **UI-Phase A. Sidebar & navigation** | ✅ **Terminé** | Focus/Export désactivés, Validation retiré du nav, Critères→Administration, BottomNav 4 items |
 | **UI-Phase B. Dashboard rebuild** | ✅ **Terminé** | 4 KPI + table 8 récents + section Focus (état vide) + donut type_decision |
 | **UI-Phase C. Liste arrêts** | ✅ **Terminé** | Search + chips filtres URL + menu ⋯ Focus + pagination 10/25/50 + tags |
@@ -526,7 +590,29 @@ LLM_STORE_RAW_OUTPUT=false
 - **Coût A100 80 Go** : ~1,50–2,50 €/h. Budget estimé pour 50 arrêts : ~3–5 € (environ 2h de GPU).
 - **Disponibilité A100 sur Vast.ai** : filtrer VRAM ≥ 79 Go impérativement (les A100 40 Go affichent parfois "80 Go").
 
-## Fichiers modifiés — session 2026-06-07
+## Fichiers modifiés — session 2026-06-07 (suite : R-Phase 4)
+
+### Nouveaux fichiers
+| Fichier | Rôle |
+|---|---|
+| `worker/audit_arret.py` | Script d'audit qualité : compare intermediate_json vs arret_criteria_values |
+| `worker/check_cols.py` | Script diagnostic colonnes Supabase (utilitaire ponctuel) |
+| `worker/check_join.py` | Script diagnostic jointure criterion_id (utilitaire ponctuel) |
+
+### Fichiers modifiés
+| Fichier | Ce qui a changé |
+|---|---|
+| `worker/analyze.py` | Normalisation `source_authority` en `.upper()` avant upsert (commit `8913bcf`) |
+
+### Décisions ajoutées
+- **vLLM sur A100 80 Go** : sans `VLLM_ATTENTION_BACKEND=XFORMERS`, avec `--enforce-eager`
+- **Cleanup Supabase** : toujours paginer les requêtes `arret_criteria_values` (`.range()` par blocs de 1000)
+- **audit_arret.py** : jointure `criterion_id = f"{langue}_{order_index:03d}_{slug}"`
+- **R-Phase 4 terminée** : 72B validé, meilleur que 32B sur profile_vulnerability
+
+---
+
+## Fichiers modifiés — session 2026-06-07 (début : UI-Phase D)
 
 ### Nouveaux fichiers
 | Fichier | Rôle |
@@ -582,7 +668,52 @@ LLM_STORE_RAW_OUTPUT=false
 
 ## Prochaine action exacte
 
-**R-Phase 4 — Test Qwen2.5-72B sur A100 80 Go Vast.ai**
+**R-Phase 5 — Amélioration extraction : audit worker + correction prompts**
+
+### Étape 1 — Audit complet du worker (à faire au début de la session)
+
+Lire et comprendre entièrement ces fichiers dans cet ordre :
+1. `worker/analyze.py` — pipeline principal, flow arrêt → groupes → LLM → stockage
+2. `worker/prompts.py` — construction des prompts system/user par groupe
+3. `worker/schemas.py` — schéma JSON guidé par groupe (enum criterion_id)
+4. `worker/clean.py` — nettoyage texte PDF
+5. `worker/segment.py` (ou équivalent) — segmentation en sections
+6. `worker/llm_provider.py` — VLLMProvider, prefilling, token usage
+7. `worker/build_intermediate.py` — construction intermediate_json
+8. `data/criteria_fr.json` — liste complète des critères FR avec groupes
+9. `data/criteria_nl.json` — liste complète des critères NL
+
+Identifier précisément :
+- Comment les sections sont mappées aux groupes (quel section_id → quel llm_group)
+- Quel texte exact reçoit le LLM pour chaque groupe
+- Pourquoi le groupe `metadata` retourne VIDE pour Date/Numéro/Juge/Avocat/Chambre
+
+### Étape 2 — Analyse sur la base des PDF et résultats attendus (fournis par la cliente)
+
+La cliente fournira :
+- Des liens vers des PDF d'arrêts CCE/RVV publics
+- Les réponses attendues pour chaque critère sur ces arrêts
+
+Sur cette base :
+- Comparer les résultats LLM actuels avec les résultats attendus
+- Identifier les patterns d'erreur systématiques
+- Corriger les prompts dans `worker/prompts.py`
+- Éventuellement ajuster la segmentation ou le mapping sections→groupes
+
+### Étape 3 — Tests et validation
+
+- Relancer l'analyse sur les arrêts de référence (Vast.ai ou Ollama local)
+- Comparer avec les résultats attendus
+- Itérer jusqu'à un taux de correspondance acceptable
+
+### Script d'audit disponible
+
+`worker/audit_arret.py` — Usage : `python audit_arret.py <numero>`
+Affiche : texte extrait par section + valeurs LLM par groupe + mots-clés présents dans le texte.
+
+---
+
+**R-Phase 4 — Test Qwen2.5-72B sur A100 80 Go Vast.ai (TERMINÉ)**
 
 1. Louer instance Vast.ai : **VRAM ≥ 79 Go** (A100 SXM4 80 Go ou H100 80 Go), template PyTorch, CUDA ≥ 12.6, disque ≥ 80 Go, RAM ≥ 64 Go
 2. Sur l'instance :
@@ -643,23 +774,22 @@ LLM_TIMEOUT_SECONDS=240
 ```
 Relis CLAUDE.md et PROJECT_STATE.md pour te remettre dans le contexte.
 
-Résumé de la session 2026-06-07 :
-- UI-Phase D terminée : modal recherche avancée 6 sections (AdvancedSearchModal.tsx), bouton activé,
-  chip effaçable, filtres directs branchés (numero, chambre, nationalite, type_dec). TypeScript 0 erreur.
-- Worker amélioré pour R-Phase 4 :
-    * prompts.py : /no_think retiré, source_authority listée explicitement
-    * schemas.py : build_schema_for_group() avec enum criterion_id (0 hallucination ID)
-    * schemas.py : troncature evidence_excerpt 150 chars enforced
-    * analyze.py : guided_json par groupe, batch upsert Supabase, fetch_pending N+1→2, token usage
-    * llm_provider.py : VLLMProvider prefilling {"items":[ + token usage + max_input 32000 + max_output 4096
-- Tout committé et pushé (commit e3ad439).
-- UI : toutes les phases A→G + D terminées. Toutes les migrations 001→009 appliquées.
+Résumé de la session 2026-06-07 (R-Phase 4 + audit qualité) :
+- R-Phase 4 terminée : Qwen2.5-72B-Instruct-AWQ sur A100 PCIe 80 Go Vast.ai.
+    * vLLM 0.11.2, --enforce-eager obligatoire (sans XFORMERS sur A100)
+    * 48/50 arrêts analysés, ~48 valeurs/arrêt, profile_vulnerability 15/15
+    * Bug source_authority casse corrigé (commit 8913bcf) : .upper() dans analyze.py
+    * Script worker/audit_arret.py créé pour comparer texte extrait vs valeurs LLM
+- Audit CCE 341995 révèle : groupe METADATA retourne VIDE pour Date/Numéro/Juge/Avocat/Chambre
+  alors que ces données sont présentes dans le texte (header anonymisé → LLM hésite).
+- Toutes les UI-Phases A→G terminées. Migrations 001→009 appliquées.
+- Instance Vast.ai détruite après la session.
 
-Prochain objectif : R-Phase 4 — test Qwen2.5-72B-Instruct-AWQ sur A100 80 Go Vast.ai.
+Prochain objectif : R-Phase 5 — audit complet du worker + amélioration des prompts.
 Séquence complète dans PROJECT_STATE.md section "Prochaine action exacte".
-Point de vigilance : si vLLM refuse le prefilling assistant, retirer la ligne dans llm_provider.py.
 
-Je suis prêt. Dis-moi si tu as loué l'instance ou si tu veux que j'aide à autre chose en attendant.
+IMPORTANT : commencer par lire entièrement les fichiers worker/ listés dans "Prochaine action exacte"
+avant toute modification. Ensuite attendre que la cliente fournisse les PDF et les réponses attendues.
 ```
 
 ## Points de vigilance permanents
