@@ -1,12 +1,12 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-06 (UI-Phases A→G terminées sauf D)
+Dernière mise à jour : 2026-06-07 (UI-Phase D terminée + worker amélioré R-Phase 4)
 
 ## Objectifs en cours
 
-1. **R-Phase 4** — Test 50 arrêts avec Qwen2.5-72B-Instruct-AWQ sur A100 80 Go (Vast.ai). En attente d'instance.
-2. **UI-Phase D** — Modal recherche avancée 6 sections sur /arrets (la plus complexe, ~4h).
-3. **Validation avocate** — Faire relire les 50 arrêts analysés avant tout traitement massif.
+1. **R-Phase 4** — Test 50 arrêts avec Qwen2.5-72B-Instruct-AWQ sur A100 80 Go (Vast.ai). Prêt à lancer — worker amélioré committé.
+2. **Validation avocate** — Faire relire les 50 arrêts analysés avant tout traitement massif.
+3. ~~UI-Phase D~~ — **Terminée** (2026-06-07).
 
 ---
 
@@ -411,7 +411,9 @@ Migration 009 (20 min)
 - **Charts statistiques** : librairie `recharts` installée (v2, compatible Next.js RSC avec wrapper "use client").
 - **UI-Phase A** : Sidebar — Recherche supprimée du nav, Focus/Export ajoutés grisés, Validation retirée, Critères→Administration. BottomNav : 4 items (Accueil, Arrêts, Stats, Focus grisé).
 - **UI-Phase B** : Dashboard — 4 KPI, table 8 récents (desktop+mobile), section Focus (état vide explicite), donut type_decision. TagPill couleur déterministe par hash.
-- **UI-Phase C** : Liste arrêts — recherche texte + toggle langue + date range, chips filtres URL, chips ×, Réinitialiser, menu ⋯ par ligne (PDF, Focus toggle), pagination URL (10/25/50), Filtres avancés bouton désactivé (Phase D).
+- **UI-Phase C** : Liste arrêts — recherche texte + toggle langue + date range, chips filtres URL, chips ×, Réinitialiser, menu ⋯ par ligne (PDF, Focus toggle), pagination URL (10/25/50), Filtres avancés bouton activé (Phase D terminée).
+- **UI-Phase D** : Modal recherche avancée — 6 sections (Procédure, Identité, Profil, Documents, Persécutions, Décision), 50+ champs, tristate / select / multicheck / textarea, colonne "Filtres sélectionnés", chip effaçable dans la barre, filtres direct sur arrets (numero, chambre, nationalite→pays_origine, type_dec→type_decision). Filtres critères-based capturés en URL, filtrage Supabase = TODO V2.
+- **Worker R-Phase 4** : `/no_think` retiré du system prompt ; `build_schema_for_group()` contraignant `criterion_id` via enum guided_json ; `evidence_excerpt` tronqué à 150 chars ; batch upsert Supabase (N→1 par groupe) ; fetch_pending_analyze N+1→2 requêtes ; VLLMProvider prefilling + token usage + max_input_chars 32000 + max_output_tokens 4096 + modèle 72B par défaut.
 - **UI-Phase E** : Fiche détail — header avec source_juridiction + type_decision badge coloré, CTA Copier l'analyse + Copier résumé + Copier par critère, Exporter PDF désactivé, section Résumé IA (resume_ai > resume), badges Confirmé (vert, conf>0.7) / Applicable (gris) / Non applicable (rouge), flag emoji pays d'origine.
 - **UI-Phase F** : Stats — 4 KPI (total, taux analyse, taux annulation, valeurs LLM), donut Langue + donut Procédure, line chart Évolution toggle 7j/30j/12m, bar chart Pays top 6 toggle 7j/30j/12m, table Top 10 critères par count + barre %.
 - **UI-Phase G** : Admin critères — banner Important jaune, table groupée par section (Nom/Langue/État/Effet/Modifié/Actions), badge État cliquable (toggle Actif↔Archivé, sync champ `active`), menu ⋯ Dupliquer, modal Créer (Nom, Description, Section, Effet date). `setStatut` synchronise aussi `active` pour le worker.
@@ -454,7 +456,7 @@ Migration 009 (20 min)
 | **UI-Phase A. Sidebar & navigation** | ✅ **Terminé** | Focus/Export désactivés, Validation retiré du nav, Critères→Administration, BottomNav 4 items |
 | **UI-Phase B. Dashboard rebuild** | ✅ **Terminé** | 4 KPI + table 8 récents + section Focus (état vide) + donut type_decision |
 | **UI-Phase C. Liste arrêts** | ✅ **Terminé** | Search + chips filtres URL + menu ⋯ Focus + pagination 10/25/50 + tags |
-| **UI-Phase D. Recherche avancée modal** | ⏳ Planifié | Modal 6 sections, URL searchParams, hors V1 la sauvegarde |
+| **UI-Phase D. Recherche avancée modal** | ✅ **Terminé** | Modal 6 sections, 50+ champs, 3 col desktop / tabs mobile, filtres URL searchParams |
 | **UI-Phase E. Fiche détail** | ✅ **Terminé** | Résumé IA, badges Confirmé/Applicable/Non applicable, CTAs Copier, flag emoji pays |
 | **UI-Phase F. Statistiques** | ✅ **Terminé** | recharts : line, 2 donuts, bar chart pays, table top 10 critères |
 | **UI-Phase G. Admin critères** | ✅ **Terminé** | Banner Important, table statut, toggle Actif/Archivé, modal Créer, Dupliquer |
@@ -515,13 +517,33 @@ LLM_STORE_RAW_OUTPUT=false
 - **Arrêts fictifs seed** : 15 arrêts (CCE 260.001–015) ont des PDF en 404 → statut `erreur`. Polluent légèrement les stats.
 - **Critères FR fusionnés** (`fr_025`, `fr_033`) : à clarifier avec la cliente.
 - **PostCSS CVE modérées** : bundlées par Next.js, non corrigeables sans downgrade.
-- **UI-Phase D non implémentée** : bouton "Filtres avancés" désactivé sur /arrets. La recherche avancée (modal 6 sections) est la prochaine grosse fonctionnalité UI.
+- **Filtres critères-based non branchés côté serveur** : les params avancés (sexe, mena, mgf, rapport_medical…) sont capturés dans l'URL mais ne filtrent pas encore Supabase. Nécessite une RPC ou une logique JOIN côté server. TODO V2.
 
 ## Risques ouverts spécifiques R-Phase 4
 
-- **`profile_vulnerability`** (15 critères) : 1 hallucination criterion_id observée sur 32B. Surveiller sur 72B.
+- **`profile_vulnerability`** (15 critères) : 1 hallucination criterion_id observée sur 32B. Le nouveau `build_schema_for_group()` + enum guidé_json devrait l'éliminer sur 72B — à vérifier.
+- **Prefilling + guided_json en conflit possible** : le message assistant `{"items":[` + `guided_json` sont combinés pour la première fois. Si vLLM rejette le message assistant prefillé, retirer la ligne `messages.append({"role": "assistant", ...})` dans VLLMProvider.
 - **Coût A100 80 Go** : ~1,50–2,50 €/h. Budget estimé pour 50 arrêts : ~3–5 € (environ 2h de GPU).
-- **Disponibilité A100 sur Vast.ai** : vérifier avant de louer, les A100 sont parfois pris.
+- **Disponibilité A100 sur Vast.ai** : filtrer VRAM ≥ 79 Go impérativement (les A100 40 Go affichent parfois "80 Go").
+
+## Fichiers modifiés — session 2026-06-07
+
+### Nouveaux fichiers
+| Fichier | Rôle |
+|---|---|
+| `src/app/(app)/arrets/AdvancedSearchModal.tsx` | Modal recherche avancée 6 sections — client, 3 colonnes desktop / tabs mobile |
+
+### Fichiers modifiés
+| Fichier | Ce qui a changé |
+|---|---|
+| `src/app/(app)/arrets/ArretFilters.tsx` | Bouton Filtres avancés activé, badge count, chip effaçable, import modal |
+| `src/app/(app)/arrets/page.tsx` | Filtres directs : numero, chambre, nationalite, type_dec |
+| `worker/prompts.py` | Retire `/no_think`, ajoute liste source_authority valides |
+| `worker/schemas.py` | `build_schema_for_group()` avec enum criterion_id, troncature evidence_excerpt 150 chars |
+| `worker/analyze.py` | guided_json par groupe, batch upsert, fetch_pending N+1→2, token usage dans model_runs |
+| `worker/llm_provider.py` | VLLMProvider : prefilling + token usage + max_input 32000 + max_output 4096 + modèle 72B |
+
+---
 
 ## Fichiers modifiés — session 2026-06-06
 
@@ -560,25 +582,59 @@ LLM_STORE_RAW_OUTPUT=false
 
 ## Prochaine action exacte
 
-**Option A — UI-Phase D (recherche avancée modal)** — ~4h
-- Créer `src/app/(app)/arrets/AdvancedSearchModal.tsx` (client, modal 3 colonnes)
-- 6 sections : Procédure, Identité, Profil, Documents, Persécutions, Décision
-- Tous les filtres via URL searchParams (partageables)
-- Déclenché par le bouton "Filtres avancés" déjà présent dans ArretFilters
-- Filtres qui touchent `arret_criteria_values` via criterion_id
+**R-Phase 4 — Test Qwen2.5-72B sur A100 80 Go Vast.ai**
 
-**Option B — R-Phase 4 (Vast.ai A100 80 Go)** — ~2h de GPU
-- Louer instance VRAM ≥ 79 Go, template PyTorch CUDA ≥ 12.6
-- git clone + pip install + .env.local
-- Lancer vLLM avec FLASHINFER_DISABLE_VERSION_CHECK=1 VLLM_ATTENTION_BACKEND=XFORMERS
-- Vider les valeurs LLM en base (garder les 50 arrêts)
-- Relancer analyze.py --limit 50
-- Comparer : nombre items, hallucinations, qualité NL
+1. Louer instance Vast.ai : **VRAM ≥ 79 Go** (A100 SXM4 80 Go ou H100 80 Go), template PyTorch, CUDA ≥ 12.6, disque ≥ 80 Go, RAM ≥ 64 Go
+2. Sur l'instance :
+   ```bash
+   git clone <repo> /workspace/saas-juridique
+   cd /workspace/saas-juridique/worker
+   python -m venv .venv
+   .venv/bin/pip install --upgrade pip
+   .venv/bin/pip install -r requirements.txt
+   .venv/bin/pip install "vllm>=0.9,<0.12"
+   # Créer .env.local à la racine avec les clés Supabase + variables LLM (voir ci-dessous)
+   ```
+3. Démarrer vLLM :
+   ```bash
+   FLASHINFER_DISABLE_VERSION_CHECK=1 \
+   VLLM_ATTENTION_BACKEND=XFORMERS \
+   nohup /workspace/saas-juridique/worker/.venv/bin/python -m vllm.entrypoints.openai.api_server \
+     --model Qwen/Qwen2.5-72B-Instruct-AWQ \
+     --port 8000 --dtype auto \
+     --max-model-len 8192 --gpu-memory-utilization 0.92 --trust-remote-code \
+     > /workspace/saas-juridique/logs/vllm.log 2>&1 &
+   ```
+4. Vider les valeurs LLM en base (garder les 50 arrêts) :
+   ```bash
+   .venv/bin/python - << 'EOF'
+   import os; from pathlib import Path; from dotenv import load_dotenv
+   load_dotenv(Path("/workspace/saas-juridique/.env.local"))
+   from supabase import create_client
+   sb = create_client(os.environ["NEXT_PUBLIC_SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
+   sb.table("arret_criteria_values").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+   sb.table("model_runs").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+   print("Valeurs LLM vidées. Les 50 arrêts extraits sont conservés.")
+   EOF
+   ```
+5. Lancer l'analyse :
+   ```bash
+   PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --limit 50 --concurrency 4
+   ```
+6. Comparer avec R-Phase 3 : nombre d'items, hallucinations criterion_id, qualité NL, temps/arrêt
 
-**Option C — Validation avocate** — décision métier
-- Montrer l'interface à la cliente
-- Faire valider les 50 arrêts analysés dans /validation
-- Décision sur la qualité avant traitement massif
+**Variables `.env.local` requises sur le serveur Vast.ai :**
+```env
+NEXT_PUBLIC_SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+LLM_PROVIDER=vllm
+VLLM_BASE_URL=http://localhost:8000/v1
+VLLM_MODEL=Qwen/Qwen2.5-72B-Instruct-AWQ
+LLM_MAX_OUTPUT_TOKENS=4096
+LLM_TIMEOUT_SECONDS=240
+```
+
+**Si prefilling + guided_json crée une erreur vLLM :** retirer la ligne `messages.append({"role": "assistant", "content": '{"items":['})` dans `worker/llm_provider.py` (VLLMProvider.complete, vers ligne 279).
 
 ---
 
@@ -587,19 +643,23 @@ LLM_STORE_RAW_OUTPUT=false
 ```
 Relis CLAUDE.md et PROJECT_STATE.md pour te remettre dans le contexte.
 
-Résumé de la session précédente (2026-06-06) :
-- Migration 009 appliquée (is_focus, type_decision, resume_ai, tags sur arrets ; statut, effet_date sur criteria)
-- UI-Phases A, B, C, E, F, G terminées (sidebar, dashboard, liste arrêts, fiche détail, stats, admin critères)
-- recharts installé. TypeScript 0 erreur, lint 0 erreur.
-- Seule UI-Phase D (modal recherche avancée 6 sections) reste à faire.
-- R-Phase 4 (Qwen2.5-72B sur A100 80 Go Vast.ai) toujours en attente d'instance.
+Résumé de la session 2026-06-07 :
+- UI-Phase D terminée : modal recherche avancée 6 sections (AdvancedSearchModal.tsx), bouton activé,
+  chip effaçable, filtres directs branchés (numero, chambre, nationalite, type_dec). TypeScript 0 erreur.
+- Worker amélioré pour R-Phase 4 :
+    * prompts.py : /no_think retiré, source_authority listée explicitement
+    * schemas.py : build_schema_for_group() avec enum criterion_id (0 hallucination ID)
+    * schemas.py : troncature evidence_excerpt 150 chars enforced
+    * analyze.py : guided_json par groupe, batch upsert Supabase, fetch_pending N+1→2, token usage
+    * llm_provider.py : VLLMProvider prefilling {"items":[ + token usage + max_input 32000 + max_output 4096
+- Tout committé et pushé (commit e3ad439).
+- UI : toutes les phases A→G + D terminées. Toutes les migrations 001→009 appliquées.
 
-Prochaines options selon priorité :
-1. UI-Phase D — modal recherche avancée sur /arrets (bouton "Filtres avancés" déjà désactivé, à activer)
-2. R-Phase 4 — test Qwen2.5-72B sur Vast.ai (VRAM ≥ 79 Go, commandes dans PROJECT_STATE.md)
-3. Validation avocate — montrer l'interface à la cliente
+Prochain objectif : R-Phase 4 — test Qwen2.5-72B-Instruct-AWQ sur A100 80 Go Vast.ai.
+Séquence complète dans PROJECT_STATE.md section "Prochaine action exacte".
+Point de vigilance : si vLLM refuse le prefilling assistant, retirer la ligne dans llm_provider.py.
 
-Dis-moi par quoi commencer.
+Je suis prêt. Dis-moi si tu as loué l'instance ou si tu veux que j'aide à autre chose en attendant.
 ```
 
 ## Points de vigilance permanents
