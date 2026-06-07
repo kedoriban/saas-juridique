@@ -949,9 +949,136 @@ fr_005_chambres_fr_cce_ou_nl_cvv: 'IIIème CHAMBRE' (status=found, conf=0.95) �
 
 ## Prochaine action exacte
 
-**R-Phase 5 — Phase 3 (suite) : stocker metadata + tester decision_reasoning**
+**R-Phase 5 — Phase 4 : validation complète 72B sur Vast.ai (8 arrêts de référence)**
 
-### Résultats dry-run metadata (2026-06-07, partiels — 2/8 traités)
+### Objectif
+Lancer `analyze_reference.py` (tous groupes) avec Qwen2.5-72B-AWQ sur A100 80 Go,
+comparer les résultats vs `RESULTAT ATTENDU.md` via `score_reference.py`.
+Décision : les seuils ci-dessous ≥ atteints → relecture avocate autorisée.
+
+### Score baseline actuel (2026-06-07 — metadata R-Phase 5 + autres groupes R-Phase 4)
+
+| Arrêt | Total | Méta | Ident | Décis | Profil | Perséc | Docs |
+|---|---|---|---|---|---|---|---|
+| CCE 341946 (DPI) | 29/48 60% | 5/7 71% | 6/9 66% | 3/8 37% | 14/15 93% | 1/2 50% | 0/1 0% |
+| CCE 341949 (non-DPI) | 7/48 14% | 5/7 71% | 2/9 22% | 0/8 0% | 0/15 0% | 0/2 0% | 0/1 0% |
+| CCE 341951 (non-DPI) | 9/48 18% | 5/7 71% | 1/9 11% | 0/8 0% | 2/15 13% | 0/2 0% | 0/1 0% |
+| CCE 341960 (DPI) | 17/48 35% | 6/7 85% | 4/9 44% | 3/8 37% | 4/15 26% | 0/2 0% | 0/1 0% |
+| CCE 341962 (DPI) | 23/48 47% | 6/7 85% | 7/9 77% | 3/8 37% | 5/15 33% | 0/2 0% | 0/1 0% |
+| CCE 341963 (non-DPI) | 9/48 18% | 5/7 71% | 0/9 0% | 0/8 0% | 4/15 26% | 0/2 0% | 0/1 0% |
+| RvV 342046 (DPI NL) | 12/48 25% | 4/7 57% | 0/11 0% | 4/9 44% | 3/13 23% | 0/1 0% | 1/1 100% |
+| RvV 342062 (non-DPI NL) | 14/48 29% | 7/7 100% | 0/11 0% | 2/9 22% | 4/13 30% | 0/1 0% | 1/1 100% |
+| **TOTAL** | **120/384 31%** | | | | | | |
+
+Note : les colonnes Décis/Profil/etc. reflètent les valeurs R-Phase 4 (sans fixes Phase 3).
+Après le run Vast.ai (Phase 3 appliquée) : attendre Décis ≥ 5/8 sur DPI, fr_025 non vide.
+
+### Seuils de décision (vert = relecture avocate autorisée)
+
+| Critère | Seuil vert |
+|---|---|
+| Couverture DPI (341946, 341960, 341962, 342046) | ≥ 65% moyenne |
+| Metadata (fr/nl_001–005) | ≥ 90% |
+| fr_025 / nl_025 Motivation CCE non vide | ≥ 2/4 arrêts DPI |
+| profile_vulnerability sur DPI | ≥ 13/15 |
+
+### UUIDs des 8 arrêts de référence
+
+| Arrêt | UUID |
+|---|---|
+| CCE 341946 fr | 0fd55631-00d4-433c-b599-5fbb75692d16 |
+| CCE 341949 fr | e62bfb49-8e15-45f9-95d5-2c558c2571d4 |
+| CCE 341951 fr | b3adae70-1776-4c6c-846f-0d0776ae742b |
+| CCE 341960 fr | 464635d4-0f8b-4b98-a408-6b5f674ac249 |
+| CCE 341962 fr | 02552ae3-ae24-40ed-9918-98a5e69f0f16 |
+| CCE 341963 fr | 6f490a37-224c-4b96-92e9-97b740ede7c4 |
+| RvV 342046 nl | 08e588e6-62dc-4c41-adc8-d0fd5dd965e6 |
+| RvV 342062 nl | ff586b0e-0ca2-4c40-b3ca-f0dac25811d8 |
+
+### Séquence Vast.ai (à exécuter après setup utilisateur)
+
+**Instance** : A100 PCIe/SXM4 80 Go (VRAM ≥ 79 Go), PyTorch, CUDA ≥ 12.6, disque ≥ 80 Go
+
+```bash
+# Sur l'instance (user fait git clone + .env.local)
+# Claude prend la main via SSH (Bash tool) une fois SSH disponible
+
+# 1. Install
+cd /workspace/saas-juridique/worker
+python -m venv .venv && .venv/bin/pip install --upgrade pip
+.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install "vllm>=0.9,<0.12"
+
+# 2. vLLM (commande validée R-Phase 4)
+nohup .venv/bin/python -m vllm.entrypoints.openai.api_server \
+  --model Qwen/Qwen2.5-72B-Instruct-AWQ \
+  --port 8000 --dtype auto --max-model-len 8192 \
+  --gpu-memory-utilization 0.92 --trust-remote-code --enforce-eager \
+  > /workspace/saas-juridique/logs/vllm.log 2>&1 &
+
+# 3. Analyse (tous groupes, ~40 min)
+PYTHONIOENCODING=utf-8 .venv/bin/python analyze_reference.py \
+  2>&1 | tee /workspace/saas-juridique/logs/analyze_reference.log
+
+# 4. Score
+PYTHONIOENCODING=utf-8 .venv/bin/python score_reference.py --verbose
+
+# 5. Audits
+for num in 341946 341960 341962 342046 341963; do
+  .venv/bin/python audit_arret.py $num > /workspace/saas-juridique/logs/audit_${num}_v2.txt
+done
+```
+
+### .env.local requis sur l'instance
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+LLM_PROVIDER=vllm
+VLLM_BASE_URL=http://localhost:8000/v1
+VLLM_MODEL=Qwen/Qwen2.5-72B-Instruct-AWQ
+LLM_MAX_OUTPUT_TOKENS=4096
+LLM_TIMEOUT_SECONDS=240
+LLM_MAX_INPUT_CHARS=32000
+```
+
+### Points de vigilance
+- Ne pas relancer `main.py --reprocess` — intermediate_json à jour en Supabase.
+- `analyze_reference.py` sans `--group` = tous les groupes, sans `--dry-run` = stocke.
+- Les valeurs existantes sont écrasées par upsert — pas besoin de vider avant.
+- En cas d'erreur vLLM prefilling : retirer `messages.append({"role": "assistant", ...})` dans VLLMProvider.
+- `score_reference.py` compare avec la DB en temps réel — lancer après la fin de l'analyse.
+
+### Stratégie tokens (session longue autonome)
+- Faire /compact après le démarrage vLLM (avant l'analyse)
+- Faire /compact après la fin de l'analyse (avant l'audit)
+- Lire les logs SSH par tranches (Select-Object -Last 30), pas en entier
+
+---
+
+## Résultats dry-run metadata — VALIDÉ (2026-06-07)
+
+| Arrêt | fr_002 numéro | fr_001 date | fr_003 juge | fr_004 avocat | fr_005 chambre |
+|---|---|---|---|---|---|
+| CCE 341963 (FR) | '341963' ✅ | '26 février 2026' ✅ | 'J. MAHIELS' ✅ | 'Me J. HARDY' ✅ | 'IIIème CHAMBRE' ✅ |
+| CCE 341960 (FR) | '341960' ✅ | '26 février 2026' ✅ | 'R. HANGANU' ✅ | 'Me G. TEFENGANG' ✅ | 'Ve CHAMBRE' ✅ |
+| CCE 341946 (FR) | '341946' ✅ | '26 février 2026' ✅ | 'M. de HEMRICOURT' ✅ | 'Me C. DESENFANS' ✅ | 'Ve CHAMBRE' ✅ |
+| CCE 341951 (FR) | '341951' ✅ | '26 février 2026' ✅ | 'G. PINTIAUX' ✅ | 'Me S. DELHEZ' ✅ | 'Ière CHAMBRE' ✅ |
+| CCE 341962 (FR) | '341962' ✅ | '26 février 2026' ✅ | 'C. ADAM' ✅ | 'Me F. BELLAKHDAR' ✅ | 'Xe chambre' ✅ |
+| CCE 341949 (FR) | '341949' ✅ | '26 février 2026' ✅ | 'G. PINTIAUX' ✅ | 'Me A. DRUITTE' ✅ | 'Ière CHAMBRE' ✅ |
+| RvV 342046 (NL) | '342046' ✅ | '27 februari 2026' ✅ | 'wnd. voorzitter' ⚠️ | None ⚠️ | 'XIde KAMER' ✅ |
+| RvV 342062 (NL) | '342062' ✅ | '28 februari 2026' ✅ | 'wnd. voorzitter' ⚠️ | — | 'XIde KAMER' ✅ |
+
+⚠️ NL : juge = titre sans nom (bug 7 partiel), avocat NL non extrait (connu). Numéros tous corrects.
+
+### Stockage metadata — TERMINÉ (2026-06-07)
+8/8 arrêts stockés (exit 0) :
+341963: 7v ✅ | 341960: 5v ✅ | 341946: 7v ✅ | 341951: 7v ✅
+341962: 7v ✅ | 341949: 7v ✅ | 342046: 7v ✅ | 342062: 4v ✅
+
+---
+
+## Résultats dry-run metadata (2026-06-07, partiels — archivé)
 
 | Arrêt | fr_002 numéro | fr_001 date | fr_003 juge | fr_004 avocat | fr_005 chambre |
 |---|---|---|---|---|---|
