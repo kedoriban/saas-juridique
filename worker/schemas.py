@@ -115,6 +115,13 @@ def normalize_response(
             item["status"] = STATUS_MAP.get(raw, "not_mentioned")
             if "needs_human_review" not in item:
                 item["needs_human_review"] = item["status"] in _REVIEW_STATUSES
+            # Coerce confidence string→float (qwen3:4b retourne "0.95" au lieu de 0.95)
+            conf = item.get("confidence")
+            if isinstance(conf, str):
+                try:
+                    item["confidence"] = float(conf)
+                except (ValueError, TypeError):
+                    item["confidence"] = None
             # Coerce les valeurs non-string retournées par le LLM (dict, list, int…)
             # Le schema attend uniquement string | null.
             val = item.get("value")

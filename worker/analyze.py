@@ -47,6 +47,127 @@ MAX_RETRIES = 2
 BOOL_TRUE  = {"oui", "true", "ja"}
 BOOL_FALSE = {"non", "false", "nee"}
 
+# Valeurs autorisées par la contrainte acv_source_authority_check
+# Clé = variante LLM (uppercase), valeur = forme canonique attendue par Supabase
+_NORMALIZE_SA: dict[str, str] = {
+    "CCE": "CCE",
+    "RVV": "RvV",
+    "RVV.": "RvV",
+    "CGRA": "CGRA",
+    "CGRa": "CGRA",
+    "DVZ": "DVZ",
+    "OE": "OE",
+}
+
+# ---------------------------------------------------------------------------
+# Fix 2 — Injection des métadonnées extraites par regex dans le groupe metadata
+# ---------------------------------------------------------------------------
+
+# Slug critère → champ IntermediateDocument.metadata_detected
+_METADATA_SLUG_MAP: dict[str, str] = {
+    # FR
+    "date_de_l_arret":          "decision_date",
+    "numero_de_l_arret":        "decision_number",
+    "juge":                     "judge",
+    "avocat_du_demandeur":      "lawyer",
+    "chambres_fr_cce_ou_nl_cvv": "chambre",
+    # NL
+    "datum_van_het_arrest":     "decision_date",
+    "nummer_van_het_arrest":    "decision_number",
+    "rechter":                  "judge",
+    "advocaat":                 "lawyer",
+    "kamers_fr_cce_of_nl_rvv":  "chambre",
+}
+
+
+def _inject_regex_metadata(
+    items: list[dict],
+    criteria: list[dict],
+    intermediate: IntermediateDocument,
+    language: str = "fr",
+    arret_numero: str = "",
+) -> list[dict]:
+    """
+    Complète les items du groupe 'metadata' avec les valeurs extraites par regex
+    (intermediate.metadata_detected) pour les critères où le LLM n'a rien trouvé.
+    Pour decision_number et decision_date, le regex / le champ Supabase est toujours
+    prioritaire sur le LLM (qui peut confondre le numéro avec des arrêts cités).
+    """
+    meta = intermediate.metadata_detected
+
+    # Numéro canonique depuis le campo 'numero' Supabase (ex. "CCE 341963", "RvV 342046").
+    # C'est la source la plus fiable — vient du scraper, pas du PDF.
+    _canonical_number: str | None = None
+    if arret_numero:
+        import re as _re
+        m = _re.search(r"(\d{5,7})", arret_numero)
+        if m:
+            _canonical_number = m.group(1)
+    items_by_id: dict[str, dict] = {item["criterion_id"]: item for item in items}
+
+    # Corriger les items où le LLM a trouvé une valeur mais a mis status=not_mentioned
+    status_fixed = 0
+    for item in items_by_id.values():
+        val = item.get("value")
+        if val and val not in ("null", "NULL", "") and item.get("status") == "not_mentioned":
+            item["status"] = "found"
+            if not item.get("source_authority"):
+                item["source_authority"] = "RvV" if language == "nl" else "CCE"
+            status_fixed += 1
+    if status_fixed:
+        print(f"    [STATUS] {status_fixed} statut(s) corrigé(s) not_mentioned→found")
+
+    # Champs où le regex est plus fiable que le LLM : le LLM confond le numéro/la date
+    # de l'arrêt examiné avec ceux d'autres arrêts cités dans le corps du texte.
+    _ALWAYS_INJECT = {"decision_number", "decision_date"}
+
+    injected = 0
+    for c in criteria:
+        field = _METADATA_SLUG_MAP.get(c.get("slug", ""))
+        if not field:
+            continue
+        # Pour le numéro : priorité au campo Supabase (arret_numero) sur le regex PDF
+        if field == "decision_number" and _canonical_number:
+            value = _canonical_number
+        else:
+            value = getattr(meta, field, None) or getattr(intermediate.document, field, None)
+        if not value:
+            continue
+        cid = c["id"]
+        existing = items_by_id.get(cid)
+        if existing and existing.get("status") == "found" and existing.get("value"):
+            if field not in _ALWAYS_INJECT:
+                continue  # LLM a déjà trouvé → ne pas écraser (sauf numéro/date)
+        items_by_id[cid] = {
+            "criterion_id":       cid,
+            "value":              value,
+            "confidence":         0.95,
+            "evidence_excerpt":   value[:150],
+            "source_authority":   "RvV" if language == "nl" else "CCE",
+            "source_section":     "header",
+            "needs_human_review": False,
+            "status":             "found",
+            "expected_value_type": c.get("expected_value_type"),
+        }
+        injected += 1
+
+    if injected:
+        print(f"    [REGEX] {injected} valeur(s) injectée(s) depuis metadata_detected")
+
+    # Reconstituer dans l'ordre des critères
+    result: list[dict] = []
+    seen: set[str] = set()
+    for c in criteria:
+        cid = c["id"]
+        if cid in items_by_id:
+            result.append(items_by_id[cid])
+            seen.add(cid)
+    # Items LLM hors-critères attendus (ne devrait pas arriver avec guided_json)
+    for item in items:
+        if item.get("criterion_id") not in seen:
+            result.append(item)
+    return result
+
 _INTERMEDIATE_DIR = Path(__file__).parent.parent / ".tmp" / "intermediate"
 
 
@@ -114,7 +235,7 @@ def fetch_segments(client, arret_id: str) -> list[dict]:
 def fetch_criteria(client, language: str) -> list[dict]:
     res = (
         client.table("criteria")
-        .select("id, label_original, expected_value_type, llm_group, section_slug")
+        .select("id, label_original, expected_value_type, llm_group, section_slug, slug")
         .eq("language", language)
         .eq("active", True)
         .order("order_index")
@@ -185,7 +306,7 @@ def store_criteria_values(
             "confidence":         item.get("confidence"),
             "evidence_excerpt":   item.get("evidence_excerpt"),
             "model_run_id":       model_run_id,
-            "source_authority":   (item.get("source_authority") or "").upper() or None,
+            "source_authority":   _NORMALIZE_SA.get((item.get("source_authority") or "").strip().upper()),
             "source_section":     item.get("source_section"),
             "needs_human_review": item.get("needs_human_review", False),
         })
@@ -476,6 +597,13 @@ def analyze_arret(
             print(f"     {status_label} — {len(items)} items — {response.duration_ms}ms{tok_info}")
         else:
             print(f"     SKIP (aucune section)")
+
+        # Fix 2 : compléter les métadonnées avec les valeurs regex (date, numéro, juge, avocat)
+        if group == "metadata":
+            items = _inject_regex_metadata(
+                items, group_criteria, intermediate,
+                language=language, arret_numero=numero,
+            )
 
         all_items.extend(items)
 

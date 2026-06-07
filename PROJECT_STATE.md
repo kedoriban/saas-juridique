@@ -1,12 +1,16 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-07 (R-Phase 4 terminée + audit qualité worker)
+Dernière mise à jour : 2026-06-07 (R-Phase 5 Phase 3 — analyse audits + corrections prompts/analyze)
 
 ## Objectifs en cours
 
-1. **R-Phase 5 — Amélioration extraction** — Audit complet du worker + correction des prompts sur la base des PDF réels fournis par la cliente + résultats attendus.
-2. **Validation avocate** — Faire relire les 50 arrêts analysés avant tout traitement massif.
-3. ~~R-Phase 4~~ — **Terminée** (2026-06-07) : 72B sur A100 80 Go, ~48 valeurs/arrêt, profile_vulnerability 15/15.
+1. **R-Phase 5 — Phase 3 : validation des corrections** — Relancer `analyze_reference.py` sur les 8 arrêts de référence (groupes `metadata` + `decision_reasoning` + `identity`) pour mesurer l'amélioration vs les anciens audits. Régénérer les fichiers audit_*.txt et comparer.
+2. **Scraper CCE 290647** — Absent de la base (arrêt ~2020), à scraper séparément avant de compléter les 9 arrêts de référence.
+3. **Validation avocate** — Faire relire les arrêts analysés avant tout traitement massif.
+4. ~~R-Phase 5 Phase 3 corrections~~ — **Faites** (2026-06-07) : 8 bugs identifiés, 6 corrections appliquées dans `prompts.py` et `analyze.py`. Validé en dry-run (numéro 341963 → correct).
+5. ~~R-Phase 5 Phase 2~~ — **Terminée** (2026-06-07) : 4 fixes worker + 8/8 metadata stockés + 8 fichiers audit générés.
+6. ~~R-Phase 5 Phase 1~~ — **Terminée** (2026-06-07) : Fix 1 header + Fix 2 regex injection + extract_metadata amélioré + llm_group NL corrigé en base.
+7. ~~R-Phase 4~~ — **Terminée** (2026-06-07) : 72B sur A100 80 Go, ~48 valeurs/arrêt, profile_vulnerability 15/15.
 
 ---
 
@@ -484,6 +488,13 @@ Migration 009 (20 min)
 - **ArretRowMenu** : composant client ⋯ par ligne (Voir fiche, Télécharger PDF, Focus toggle via server action).
 - **countryFlag** : 30+ pays FR → flag emoji dans utils.ts.
 - **deriveCriteriaStatus** : logique Confirmé/Applicable/Non applicable dans utils.ts.
+- **Fix 1 (metadata group)** : `"header"` en tête de GROUP_SECTIONS["metadata"] — section `"header"` = texte avant le premier titre de section (date, numéro, chambre).
+- **Fix 2 (regex injection)** : `_inject_regex_metadata()` dans analyze.py — fallback depuis metadata_detected pour 5 critères (date, numéro, juge, avocat, chambre). Ne jamais écraser un item LLM avec status=found.
+- **MetadataDetected.chambre** : nouveau champ backward-compatible (default=None). Les anciens intermediate_json retournent None pour ce champ via from_dict.
+- **`main.py --reprocess`** : pour tout rebuild des intermediate_json, utiliser ce flag. Pas de reset de statut en base nécessaire.
+- **nl_001 + nl_006 llm_group** : corrigés en Supabase (general → metadata). Ne pas ré-importer les critères NL depuis le JSON sans vérifier ces deux critères au préalable.
+- **RESULTAT ATTENDU.md** : fichier de référence client à conserver à la racine du projet. Contient 9 arrêts avec valeurs attendues pour chaque critère.
+- **Gaps Phase 2** : not_applicable pour non-DPI, type_decision extraction, resume_ai génération, format structuré fr_006/nl_006.
 
 ## Stack retenue
 
@@ -516,7 +527,7 @@ Migration 009 (20 min)
 | R-Phase 2. Analyse LLM JSON intermédiaire | ✅ Terminé | analyze.py + prompts.py + schemas.py + build_intermediate.py + migration 008 |
 | R-Phase 3. Test Qwen2.5-32B / RTX 3090 | ✅ **Terminé** | 50 arrêts analysés. Bugs corrigés. ~47 valeurs/arrêt asile. |
 | **R-Phase 4. Test Qwen2.5-72B / A100 80 Go** | ✅ **Terminé** | 48/50 arrêts, 72B validé, --enforce-eager, source_authority fix |
-| **R-Phase 5. Amélioration extraction prompts** | 🔴 À faire | Audit worker + PDF référence + résultats attendus → correction prompts |
+| **R-Phase 5. Amélioration extraction prompts** | 🟡 En cours | Phase 1 ✅ Phase 2 ✅ Phase 3 : analyse audits + corrections prompts |
 | **UI-Phase A. Sidebar & navigation** | ✅ **Terminé** | Focus/Export désactivés, Validation retiré du nav, Critères→Administration, BottomNav 4 items |
 | **UI-Phase B. Dashboard rebuild** | ✅ **Terminé** | 4 KPI + table 8 récents + section Focus (état vide) + donut type_decision |
 | **UI-Phase C. Liste arrêts** | ✅ **Terminé** | Search + chips filtres URL + menu ⋯ Focus + pagination 10/25/50 + tags |
@@ -589,6 +600,166 @@ LLM_STORE_RAW_OUTPUT=false
 - **Prefilling + guided_json en conflit possible** : le message assistant `{"items":[` + `guided_json` sont combinés pour la première fois. Si vLLM rejette le message assistant prefillé, retirer la ligne `messages.append({"role": "assistant", ...})` dans VLLMProvider.
 - **Coût A100 80 Go** : ~1,50–2,50 €/h. Budget estimé pour 50 arrêts : ~3–5 € (environ 2h de GPU).
 - **Disponibilité A100 sur Vast.ai** : filtrer VRAM ≥ 79 Go impérativement (les A100 40 Go affichent parfois "80 Go").
+
+## R-Phase 5 — Phase 1 terminée (2026-06-07)
+
+### Contexte : fichier RESULTAT ATTENDU.md
+
+La cliente a fourni `RESULTAT ATTENDU.md` : analyses complètes de 9 arrêts de référence (CCE 290647, 341963, 341960, 341946, 341951, 341962, 341949 + RvV 342046, 342062) avec les valeurs attendues critère par critère.
+
+### Diagnostic initial (avant fixes)
+
+| Problème | Cause identifiée |
+|---|---|
+| groupe `metadata` → tout vide | section `"header"` absente de GROUP_SECTIONS["metadata"] |
+| Fix 2 sans effet | `metadata_detected` null dans les intermediate_json existants |
+| Un seul avocat extrait | `break` après premier match dans `_RE_LAWYER` |
+| Chambre absente | aucune extraction regex de la chambre |
+| `nl_001` datum absent du groupe | `llm_group=general` en Supabase au lieu de `metadata` |
+| auth=CCE pour arrêts NL | valeur hardcodée dans `_inject_regex_metadata` |
+
+### Fixes appliqués
+
+**Fix 1 — `worker/prompts.py`**
+- `"header"` ajouté en tête de `GROUP_SECTIONS["metadata"]` → LLM reçoit les premières lignes de l'arrêt
+- `"dispositif"` / `"dictum"` remontés en 2ème position (juge non anonymisé dans le dispositif)
+
+**Fix 2 — `worker/analyze.py`**
+- `_METADATA_SLUG_MAP` : mapping slug → champ `metadata_detected` (FR + NL, 5 critères dont chambre)
+- `_inject_regex_metadata()` : injecte les valeurs regex quand LLM retourne null, sans écraser les valeurs LLM valides
+- `source_authority` language-aware : `"RvV"` si langue=nl, `"CCE"` si langue=fr
+- `fetch_criteria()` : `slug` ajouté au SELECT Supabase (nécessaire pour le mapping)
+
+**Fix 3 — `worker/extract_metadata.py`**
+- `_RE_CHAMBRE` : extrait le numéro de chambre (Ière, IIIème, XIde, etc.) — patterne excluant les faux positifs comme "V" de "RvV"
+- `_RE_NUMBER_FALLBACK` : fallback pour "n° 341 968" sans préfixe "arrêt/arrest"
+- Extraction de **tous les avocats** (plus de `break`) avec préfixe "Me " → ex. "Me J. HARDY ; Me F. LAURENT"
+- Juge : fallback sur `text[-2000:]` (dispositif/signature, non anonymisé)
+- Champ `chambre: str | None = None` ajouté à `MetadataExtractionResult`
+
+**Fix 4 — `worker/build_intermediate.py`**
+- Champ `chambre` ajouté à `MetadataDetected` (avec default None, backward-compatible)
+- `from_dict` lit `chambre` depuis le JSON
+- Construction depuis `meta_result.chambre`
+
+**Fix 5 — `worker/main.py`**
+- Flag `--reprocess` : retraite les arrêts avec `statut=termine/erreur` pour regénérer leur `intermediate_json`
+
+**Fix 6 — Supabase**
+- `nl_001_datum_van_het_arrest` : `llm_group` corrigé `general` → `metadata`
+- `nl_006_datum_van_aankomst...` : `llm_group` corrigé `general` → `metadata`
+
+### Résultat du dry-run après Phase 1 (CCE 342057, NL)
+
+```
+nl_002_nummer_van_het_arrest: '342 057' (status=found, conf=0.95, auth=RvV) ✅
+nl_003_rechter: 'N. VERMANDER'          (status=found, conf=0.95, auth=RvV) ✅
+nl_004_advocaat: 'A. VAN OVERBERGHE, C. DECORDIER, T. BRICOUT, S. VAN ROMPAEY' ✅
+nl_005_kamers: 'RvV'                    (partiel — regex à tester post-reprocess)
+nl_001_datum: absent (llm_group corrigé, sera présent après reprocess)
+```
+
+### Gaps restants identifiés (Phase 3+)
+
+| Gap | Plan |
+|---|---|
+| `not_applicable` pour arrêts non-DPI | Améliorer SYSTEM_PROMPT : guidance sur détection type procédure |
+| `type_decision` non extrait | Regex sur dispositif + update `arrets.type_decision` |
+| `resume_ai` non généré | Nouveau groupe `"summary"` → update `arrets.resume_ai` |
+| Format structuré `fr_006` (date arrivée+DPI) | Guider le LLM vers format "Arrivée: X ; DPI: Y" |
+| ~~`intermediate_json` stale~~ | ~~`main.py --reprocess --limit 50`~~ ✅ **FAIT** |
+
+---
+
+## R-Phase 5 — Phase 2 terminée (2026-06-07)
+
+### Contexte
+Suite du dry-run groupe `metadata` : 3 bugs bloquants identifiés, 4 fixes appliqués, 8/8 arrêts de référence stockés avec succès. Les 8 fichiers audit sont disponibles dans `worker/audit_*.txt` pour comparaison avec `RESULTAT ATTENDU.md`.
+
+### Bugs identifiés et corrigés
+
+| Fix | Fichier | Problème | Solution |
+|---|---|---|---|
+| Fix A | `worker/schemas.py` | `qwen3:4b` retourne `"0.95"` (string) → schema validation échoue 3× → 0 items LLM pour FR | Coercer `confidence` string→float dans `normalize_response()` |
+| Fix B | `worker/analyze.py` | LLM retourne valeur avec `status=not_mentioned` (contradiction) → mauvais statut stocké | Passe de correction dans `_inject_regex_metadata()` : not_mentioned→found si valeur présente |
+| Fix C | `worker/analyze.py` | `source_authority` `.upper()` → `"RVV"` interdit par contrainte SQL ; LLM retourne `"unknown"` → `"UNKNOWN"` interdit | `_NORMALIZE_SA` whitelist : `"RVV"`→`"RvV"`, `"UNKNOWN"`→None |
+| Fix D | `worker/analyze.py` | `decision_date` et `decision_number` absents de `MetadataDetected` (dans `DocumentInfo`) → injection rate fr_001/fr_002 | Fallback `getattr(intermediate.document, field, None)` dans `_inject_regex_metadata()` |
+
+### Nouveaux scripts utilitaires
+
+| Fichier | Rôle |
+|---|---|
+| `worker/analyze_reference.py` | Lance analyze.py sur les 9 arrêts de référence (par numéro) |
+| `worker/list_arrets.py` | Liste les arrêts en base avec numéro/langue/statut |
+| `worker/check_cache.py` | Affiche le metadata_detected du cache disque pour un arrêt |
+
+### Résultat dry-run après Phase 2
+
+**CCE 342057 (NL)** — 5 statuts corrigés :
+```
+nl_001 date      : '27 februari 2026' (status=found, auth=RvV) ✅
+nl_002 numéro    : '342 057'          (status=found, auth=RvV) ✅
+nl_003 juge      : 'N. VERMANDER'     (status=found, auth=RvV) ✅
+nl_005 chambre   : 'IIde KAMER'       (status=found, auth=RvV) ✅
+```
+
+**CCE 341935 (FR)** — plus d'erreur schema :
+```
+fr_001 date      : '26 février 2026'  (status=found, auth=CCE) ✅
+fr_002 numéro    : 'n°341 935'        (status=found, auth=CCE) ✅
+fr_003 juge      : 'N. RENIERS'       (status=found, auth=CCE) ✅
+fr_004 avocat    : 'Maître E. TCHIBONSOU' (status=found)       ✅
+fr_005 chambre   : 'VIIE CHAMBRE'     (status=found, auth=CCE) ✅
+```
+
+### Audit CCE 341963 — constat important
+CCE 341963 est un **cas OQT séjour étudiant** (pas DPI/asile). Comportement correct :
+- Metadata : juge ✅, avocat ✅, chambre ✅, date ✅, numéro ✅ (après Fix D)
+- Critères DPI : tous `not_mentioned` → devrait être `not_applicable` (gap Phase 3)
+- Nationalité turque présente dans le texte mais non extraite (groupe identity non relancé)
+
+### État des 8 arrêts de référence en base
+
+| Arrêt | Langue | Metadata stocké | Type cas |
+|---|---|---|---|
+| CCE 341963 | FR | ✅ 7 valeurs | OQT étudiant (non-DPI) |
+| CCE 341960 | FR | ✅ 5 valeurs | À confirmer |
+| CCE 341946 | FR | ✅ 7 valeurs | Asile (DPI) |
+| CCE 341951 | FR | ✅ 7 valeurs | 9bis (non-DPI probable) |
+| CCE 341962 | FR | ✅ 7 valeurs | À confirmer |
+| CCE 341949 | FR | ✅ 7 valeurs | OQT (non-DPI probable) |
+| CCE 342046 | NL | ✅ 7 valeurs | À confirmer |
+| CCE 342062 | NL | ✅ 7 valeurs | Dublin (non-DPI) |
+| CCE 290647 | FR | ❌ absent | À scraper (arrêt ~2020) |
+
+---
+
+## Fichiers modifiés — session 2026-06-07 (R-Phase 5 Phase 1)
+
+### Fichiers modifiés
+| Fichier | Ce qui a changé |
+|---|---|
+| `worker/prompts.py` | Fix 1 : `"header"`, `"dispositif"`, `"dictum"` en tête de GROUP_SECTIONS["metadata"] |
+| `worker/analyze.py` | Fix 2 : `_METADATA_SLUG_MAP` + `_inject_regex_metadata()` + `source_authority` language-aware + `slug` dans fetch_criteria |
+| `worker/extract_metadata.py` | `_RE_CHAMBRE` + `_RE_NUMBER_FALLBACK` + tous avocats + juge fin de texte + champ `chambre` |
+| `worker/build_intermediate.py` | Champ `chambre` dans `MetadataDetected` + `from_dict` + construction |
+| `worker/main.py` | Flag `--reprocess` pour rebuild intermediate_json des arrêts terminés |
+
+### Décisions
+- **RESULTAT ATTENDU.md** : fichier de référence pour 9 arrêts (CCE + RvV), à conserver à la racine du projet
+- **Fix 2 validé** : injection regex fonctionne pour numéro, juge, avocats multiples
+- **nl_001 + nl_006 corrigés** en Supabase (llm_group general → metadata) — ne pas ré-importer les critères depuis le JSON sans vérifier d'abord
+- **source_authority** pour les injections regex : "RvV" si langue=nl, "CCE" si langue=fr
+- **Chambre regex** : requiert ≥ 2 chars romains OU 1 char avec suffixe ordinal explicite (évite faux positifs "V" de "RvV")
+- **confidence coercion** : `normalize_response()` dans schemas.py coerce string→float avant validation schema (fix qwen3:4b)
+- **`_NORMALIZE_SA`** : whitelist source_authority dans `store_criteria_values` — "RVV"→"RvV", "UNKNOWN"/"unknown"/autres→None. Remplace le `.upper()` brut.
+- **`decision_date` / `decision_number`** sont dans `DocumentInfo` (intermediate.document), pas dans `MetadataDetected`. `_inject_regex_metadata()` cherche dans les deux via fallback.
+- **CCE 290647** absent de la base — arrêt ~2020, hors du lot FR scrapé (341931–342062). À scraper séparément.
+- **audit_arret.py** : `sys.stdout.reconfigure(encoding="utf-8")` ajouté pour éviter le mangling UTF-8 dans les pipes PowerShell.
+- **analyze_reference.py** : utiliser `.ilike("numero", f"%{numero}%")` car les numéros en base ont le préfixe "CCE " (ex. "CCE 341963").
+- **Fichiers audit générés** : `worker/audit_341963.txt` … `worker/audit_342062.txt` — 8 fichiers pour comparaison manuelle avec RESULTAT ATTENDU.md.
+
+---
 
 ## Fichiers modifiés — session 2026-06-07 (suite : R-Phase 4)
 
@@ -666,50 +837,188 @@ LLM_STORE_RAW_OUTPUT=false
 
 ---
 
+## R-Phase 5 — Phase 3 : analyse audits + corrections (2026-06-07)
+
+### Analyse comparative effectuée
+
+Les 8 fichiers `worker/audit_*.txt` ont été lus et comparés avec `RESULTAT ATTENDU.md`.
+
+**Scores observés (avant corrections) :**
+
+| Arrêt | Type | Score LLM |
+|---|---|---|
+| 341946 (FR, DPI Burundi) | DPI accordé | 17/48 |
+| 341960 (FR, DPI Guinée MENA) | DPI refusé | 9/48 |
+| 341962 (FR, DPI Sénégal LGBT) | DPI refusé | 13/48 |
+| 341963 (FR, OQT étudiant) | Non-DPI | 6/48 |
+| 341949 (FR, OQT cohabitation) | Non-DPI | 6/48 |
+| 341951 (FR, 9bis + OQT) | Non-DPI | 8/48 |
+| 342046 (NL, DPI Russie) | DPI refusé | 9/48 |
+| 342062 (NL, Dublin Croatie) | Non-DPI | 11/48* |
+
+### 8 bugs identifiés avec causes racines
+
+| # | Pattern | Cause racine |
+|---|---|---|
+| 1 | Numéro d'arrêt incorrect (341951→281845, 341960→227624, 341963→341961, 342062→342080) | `_RE_ARRET_NUMBER` cherche dans le texte complet, trouve un arrêt cité avant le bon numéro du header |
+| 2 | Motivation CCE systématiquement VIDE (8/8) | `acte_attaque` et `conclusion_cgra_ou_oe` absents de `GROUP_SECTIONS["decision_reasoning"]` |
+| 3 | Nationalité absente pour arrêts non-DPI courts | `header` absent de `GROUP_SECTIONS["identity"]` |
+| 4 | Critères DPI → ABSENT/VIDE au lieu de `not_applicable` | Aucune guidance dans SYSTEM_PROMPT sur la détection du type procédure |
+| 5 | VGV NL confondu avec persécutions politiques | LLM ne comprend pas que VGV = Mutilations Génitales Féminines |
+| 6 | Date/numéro incorrects sur arrêts corrigés (342062) | Header commence par "DIT ARREST WERD VERBETERD…" — LLM prend la mauvaise info |
+| 7 | Juge NL : titre sans nom (342046) | LLM retourne "wnd. voorzitter" au lieu de "V. HOEFNAGELS" |
+| 8 | COI (pays d'origine) vides malgré présence | `acte_attaque` (inventaire COI) absent de `GROUP_SECTIONS["evidence_documents"]` |
+
+### Corrections appliquées
+
+**`worker/prompts.py` :**
+- `GROUP_MAX_CHARS` : `decision_reasoning` → 16 000 chars (était 6 500), `profile_vulnerability` → 10 000
+- `identity` : `"header"` ajouté en première position → corrige bug 3
+- `decision_reasoning` : `"acte_attaque"` + `"conclusion_cgra_ou_oe"` ajoutés AVANT `"motivation_cgra_ou_oe"` → corrige bug 2
+- `evidence_documents` : `"acte_attaque"` ajouté en première position → corrige bug 8
+- `SYSTEM_PROMPT` : guidance `not_applicable` pour arrêts non-DPI (OQT, 9bis, Dublin, étudiant) → corrige bug 4
+- `SYSTEM_PROMPT` : définition VGV = Vrouwelijke Genitale Verminking → corrige bug 5
+- `SYSTEM_PROMPT` : guidance numéro d'arrêt (ignorer numéros cités dans le corps) → aide bug 1
+
+**`worker/analyze.py` :**
+- `_inject_regex_metadata` : nouveau paramètre `arret_numero` (campo Supabase, ex. "CCE 341963")
+- `_canonical_number` : extrait le numéro pur depuis `arret_numero` — source la plus fiable (scraper web)
+- Pour `decision_number` : `_canonical_number` (Supabase) > regex PDF > LLM → corrige bug 1 et 6
+- `_ALWAYS_INJECT` : `decision_number` + `decision_date` toujours injectés même si LLM a déjà trouvé
+
+### Validation dry-run (341963)
+
+```
+fr_001_date_de_l_arret: '26 février 2026'  (status=found, conf=0.95) ✅
+fr_002_numero_de_l_arret: '341963'          (status=found, conf=0.95) ✅ (était '341961')
+fr_003_juge: 'J. MAHIELS'                  (status=found, conf=0.95) ✅
+fr_004_avocat_du_demandeur: 'Me J. HARDY'  (status=found, conf=0.95) ✅
+fr_005_chambres_fr_cce_ou_nl_cvv: 'IIIème CHAMBRE' (status=found, conf=0.95) ✅
+```
+
+### Gaps restants (Phase 4+)
+
+| Gap | Statut |
+|---|---|
+| `type_decision` non extrait | Non traité — regex sur dispositif ("annule"→annulation) |
+| `resume_ai` non généré | Non traité — nouveau groupe `"summary"` à créer |
+| Format `fr_006` (date arrivée+DPI) | Non traité — guider le LLM vers format "Arrivée: X ; DPI: Y" |
+| Juge NL sans nom complet | Partiellement traité via injection regex — à vérifier |
+| CCE 290647 absent | Non traité — arrêt ~2020, à scraper |
+
+---
+
+## Fichiers modifiés — session 2026-06-07 (R-Phase 5 Phase 2)
+
+### Nouveaux fichiers
+| Fichier | Rôle |
+|---|---|
+| `worker/analyze_reference.py` | Lance analyze.py sur les 9 arrêts de référence par numéro (ilike) |
+| `worker/list_arrets.py` | Liste tous les arrêts en base avec numéro/langue/statut |
+| `worker/check_cache.py` | Affiche metadata_detected du cache disque ou Supabase pour un arrêt |
+
+### Fichiers modifiés
+| Fichier | Ce qui a changé |
+|---|---|
+| `worker/schemas.py` | Fix A : coercion `confidence` string→float dans `normalize_response()` |
+| `worker/analyze.py` | Fix B : passe status not_mentioned→found si valeur présente ; Fix C : `_NORMALIZE_SA` whitelist source_authority ; Fix D : fallback `intermediate.document` pour decision_date/decision_number |
+| `worker/audit_arret.py` | `sys.stdout.reconfigure(encoding="utf-8")` pour pipes PowerShell |
+
+---
+
+## Fichiers modifiés — session 2026-06-07 (R-Phase 5 Phase 3)
+
+### Fichiers modifiés
+| Fichier | Ce qui a changé |
+|---|---|
+| `worker/prompts.py` | `GROUP_MAX_CHARS` (decision_reasoning→16 000, profile_vulnerability→10 000) ; `header` dans identity ; `acte_attaque`+`conclusion_cgra_ou_oe` dans decision_reasoning ; `acte_attaque` dans evidence_documents ; SYSTEM_PROMPT : guidance not_applicable + VGV + numéro d'arrêt |
+| `worker/analyze.py` | `_inject_regex_metadata` : param `arret_numero`, `_canonical_number` depuis Supabase, `_ALWAYS_INJECT` pour decision_number/decision_date |
+
+### Décisions ajoutées (Phase 3)
+
+- **Numéro canonique** : toujours injecter le numéro depuis le campo `arrets.numero` (Supabase, ex. "CCE 341963") — plus fiable que le regex PDF ou le LLM qui confondent avec des arrêts cités dans le corps.
+- **`_ALWAYS_INJECT`** : `decision_number` et `decision_date` sont toujours écrasés par le regex/Supabase, même si le LLM a retourné `status=found`.
+- **`GROUP_MAX_CHARS["decision_reasoning"] = 16000`** : la limite de 6 500 chars empêchait d'atteindre le raisonnement CCE (en fin de longues sections CGRA). Avec 16 000, `acte_attaque` (≤15 000 chars) est lu en entier.
+- **Ordre dans `decision_reasoning`** : `acte_attaque` et `conclusion_cgra_ou_oe` avant `motivation_cgra_ou_oe` — sections CGRA trop longues consommaient tout le budget avant que le raisonnement CCE soit atteint.
+- **`header` dans `identity`** : les arrêts non-DPI courts (3 sections) n'ont la nationalité que dans le header, pas dans `faits_invokes`.
+- **Guidance VGV** : le LLM confond `VGV` (critère NL = MGF) avec d'autres formes de persécution — définition explicite nécessaire dans le SYSTEM_PROMPT.
+- **Guidance not_applicable** : sans guidance, le LLM retourne ABSENT/VIDE pour les critères DPI sur les arrêts non-DPI, rendant les résultats indiscernables des DPI avec info manquante.
+- **analyze_reference.py ne supporte pas `--numero`** comme filtre individuel — il traite tous les arrêts de référence en base. Pour tester un seul arrêt, utiliser `analyze.py --arret-id <uuid> --group <group>`.
+
+---
+
 ## Prochaine action exacte
 
-**R-Phase 5 — Amélioration extraction : audit worker + correction prompts**
+**R-Phase 5 — Phase 3 (suite) : stocker metadata + tester decision_reasoning**
 
-### Étape 1 — Audit complet du worker (à faire au début de la session)
+### Résultats dry-run metadata (2026-06-07, partiels — 2/8 traités)
 
-Lire et comprendre entièrement ces fichiers dans cet ordre :
-1. `worker/analyze.py` — pipeline principal, flow arrêt → groupes → LLM → stockage
-2. `worker/prompts.py` — construction des prompts system/user par groupe
-3. `worker/schemas.py` — schéma JSON guidé par groupe (enum criterion_id)
-4. `worker/clean.py` — nettoyage texte PDF
-5. `worker/segment.py` (ou équivalent) — segmentation en sections
-6. `worker/llm_provider.py` — VLLMProvider, prefilling, token usage
-7. `worker/build_intermediate.py` — construction intermediate_json
-8. `data/criteria_fr.json` — liste complète des critères FR avec groupes
-9. `data/criteria_nl.json` — liste complète des critères NL
+| Arrêt | fr_002 numéro | fr_001 date | fr_003 juge | fr_004 avocat | fr_005 chambre |
+|---|---|---|---|---|---|
+| CCE 341963 (FR) | '341963' ✅ | '26 février 2026' ✅ | 'J. MAHIELS' ✅ | 'Me J. HARDY' ✅ | 'IIIème CHAMBRE' ✅ |
+| CCE 341960 (FR) | '341960' ✅ | '26 février 2026' ✅ | 'R. HANGANU' ✅ | 'Me G. TEFENGANG' ✅ | 'Ve CHAMBRE' ✅ |
 
-Identifier précisément :
-- Comment les sections sont mappées aux groupes (quel section_id → quel llm_group)
-- Quel texte exact reçoit le LLM pour chaque groupe
-- Pourquoi le groupe `metadata` retourne VIDE pour Date/Numéro/Juge/Avocat/Chambre
+Note : qwen3:4b timeout fréquents (Ollama local), mais le fallback regex injecte 5 valeurs correctement. Le fix `_canonical_number` est validé.
 
-### Étape 2 — Analyse sur la base des PDF et résultats attendus (fournis par la cliente)
+### Étape 1 — Vérifier que le dry-run metadata complet est terminé
 
-La cliente fournira :
-- Des liens vers des PDF d'arrêts CCE/RVV publics
-- Les réponses attendues pour chaque critère sur ces arrêts
+Le process `analyze_reference.py --group metadata --dry-run` a été lancé en background le 2026-06-07.
+Si le résultat n'est pas encore disponible, relancer manuellement :
 
-Sur cette base :
-- Comparer les résultats LLM actuels avec les résultats attendus
-- Identifier les patterns d'erreur systématiques
-- Corriger les prompts dans `worker/prompts.py`
-- Éventuellement ajuster la segmentation ou le mapping sections→groupes
+```powershell
+cd C:\Projects\saas-juridique-cce-rvv\worker
+.venv\Scripts\activate
+$env:PYTHONIOENCODING="utf-8"
+python analyze_reference.py --group metadata --dry-run
+```
 
-### Étape 3 — Tests et validation
+Vérifier que tous les numéros sont corrects (341946, 341949, 341951, 341962, 342046, 342062).
 
-- Relancer l'analyse sur les arrêts de référence (Vast.ai ou Ollama local)
-- Comparer avec les résultats attendus
-- Itérer jusqu'à un taux de correspondance acceptable
+### Étape 2 — Stocker metadata (si dry-run OK)
 
-### Script d'audit disponible
+```powershell
+python analyze_reference.py --group metadata
+```
 
-`worker/audit_arret.py` — Usage : `python audit_arret.py <numero>`
-Affiche : texte extrait par section + valeurs LLM par groupe + mots-clés présents dans le texte.
+### Étape 3 — Tester decision_reasoning (le plus critique)
+
+```powershell
+# Dry-run sur 341946 (DPI Burundi accordé — cas idéal pour valider Motivation CCE)
+python analyze.py --arret-id <uuid-341946> --group decision_reasoning --dry-run
+```
+
+Vérifier que `fr_025_motivation_du_cce` et `fr_026_conclusion_cgra_ou_oe` sont remplis (étaient vides en 8/8 avant corrections).
+
+### Étape 4 — Tester identity (nationalité non-DPI)
+
+```powershell
+# Dry-run sur 341963 (OQT étudiant turc — nationalité attendue : turc)
+python analyze.py --arret-id <uuid-341963> --group identity --dry-run
+```
+
+### Étape 5 — Si tous les groupes OK : régénérer les audits v2
+
+```powershell
+python audit_arret.py 341946 | Out-File -Encoding utf8 audit_341946_v2.txt
+python audit_arret.py 341963 | Out-File -Encoding utf8 audit_341963_v2.txt
+python audit_arret.py 342046 | Out-File -Encoding utf8 audit_342046_v2.txt
+python audit_arret.py 342062 | Out-File -Encoding utf8 audit_342062_v2.txt
+```
+
+Comparer les v2 avec `RESULTAT ATTENDU.md`.
+
+### Étape 6 — Gaps restants (après validation)
+
+- **`type_decision`** : regex sur dispositif ("annule"→annulation) dans `extract_metadata.py`
+- **`resume_ai`** : nouveau groupe `"summary"` dans `prompts.py`
+- **Format `fr_006`/`nl_006`** : guider le LLM vers "Arrivée : X ; DPI : Y"
+- **CCE 290647** : `python scraper.py --lang fr --limit 1`
+
+### Points de vigilance
+- Ne pas relancer `main.py --reprocess` — les intermediate_json existants sont à jour.
+- Les corrections de `prompts.py`/`analyze.py` s'appliquent à l'étape analyze, pas extract.
+- `analyze_reference.py` ne filtre pas par numéro — traite tous les arrêts de référence en base.
+- Pour un seul arrêt : `python analyze.py --arret-id <uuid> --group <group> --dry-run`
 
 ---
 
@@ -774,22 +1083,30 @@ LLM_TIMEOUT_SECONDS=240
 ```
 Relis CLAUDE.md et PROJECT_STATE.md pour te remettre dans le contexte.
 
-Résumé de la session 2026-06-07 (R-Phase 4 + audit qualité) :
-- R-Phase 4 terminée : Qwen2.5-72B-Instruct-AWQ sur A100 PCIe 80 Go Vast.ai.
-    * vLLM 0.11.2, --enforce-eager obligatoire (sans XFORMERS sur A100)
-    * 48/50 arrêts analysés, ~48 valeurs/arrêt, profile_vulnerability 15/15
-    * Bug source_authority casse corrigé (commit 8913bcf) : .upper() dans analyze.py
-    * Script worker/audit_arret.py créé pour comparer texte extrait vs valeurs LLM
-- Audit CCE 341995 révèle : groupe METADATA retourne VIDE pour Date/Numéro/Juge/Avocat/Chambre
-  alors que ces données sont présentes dans le texte (header anonymisé → LLM hésite).
-- Toutes les UI-Phases A→G terminées. Migrations 001→009 appliquées.
-- Instance Vast.ai détruite après la session.
+Résumé de la session 2026-06-07 (R-Phase 5 Phase 2) :
+- R-Phase 5 Phase 3 terminée : analyse comparative 8 audits vs RESULTAT ATTENDU.md.
+    * 8 bugs identifiés avec causes racines (numéro incorrect, motivation CCE vide, VGV confondu…)
+    * 6 corrections appliquées dans worker/prompts.py et worker/analyze.py
+    * Validation dry-run sur 341963 : fr_002 retourne '341963' (était '341961') ✅
+- worker/prompts.py modifié :
+    * GROUP_MAX_CHARS : decision_reasoning→16 000, profile_vulnerability→10 000
+    * identity : "header" en première position
+    * decision_reasoning : "acte_attaque" + "conclusion_cgra_ou_oe" avant "motivation_cgra_ou_oe"
+    * evidence_documents : "acte_attaque" en première position
+    * SYSTEM_PROMPT : guidance not_applicable (OQT/9bis/Dublin/étudiant) + VGV + numéro d'arrêt
+- worker/analyze.py modifié :
+    * _inject_regex_metadata : param arret_numero, _canonical_number depuis Supabase, _ALWAYS_INJECT
 
-Prochain objectif : R-Phase 5 — audit complet du worker + amélioration des prompts.
-Séquence complète dans PROJECT_STATE.md section "Prochaine action exacte".
+Prochain objectif : R-Phase 5 Phase 3 (suite) — relancer analyze_reference.py sur les
+arrêts de référence (groupes metadata + decision_reasoning + identity), régénérer les
+fichiers audit_*_v2.txt et comparer avec RESULTAT ATTENDU.md pour valider les corrections.
 
-IMPORTANT : commencer par lire entièrement les fichiers worker/ listés dans "Prochaine action exacte"
-avant toute modification. Ensuite attendre que la cliente fournisse les PDF et les réponses attendues.
+IMPORTANT :
+- Ne pas relancer main.py --reprocess — les intermediate_json existants sont à jour.
+- Les corrections de prompts.py/analyze.py s'appliquent à l'étape analyze uniquement.
+- analyze_reference.py ne filtre pas par numéro — il traite tous les arrêts de référence en base.
+- Pour un seul arrêt : python analyze.py --arret-id <uuid> --group <group> --dry-run
+- CCE 290647 toujours absent de la base — à scraper séparément.
 ```
 
 ## Points de vigilance permanents

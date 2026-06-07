@@ -19,17 +19,28 @@ from build_intermediate import IntermediateDocument, SectionEntry
 
 MAX_PASSAGE_CHARS = 6500
 
+# Plafond de caractères par groupe (surcharge MAX_PASSAGE_CHARS).
+# decision_reasoning reçoit des sections potentiellement longues (acte_attaque,
+# conclusion_cgra_ou_oe) — on augmente la fenêtre pour atteindre le raisonnement CCE.
+GROUP_MAX_CHARS: dict[str, int] = {
+    "decision_reasoning": 16000,
+    "profile_vulnerability": 10000,
+}
+
 # Mapping groupe → section_ids prioritaires (ordre de pertinence).
 # Inclut les anciens noms (fallback arrêts pré-Phase-1) ET les nouveaux.
 GROUP_SECTIONS: dict[str, list[str]] = {
     "metadata": [
-        # Sections structurelles FR (nouvelles + fixes)
+        # Header = texte avant le premier titre de section (date, numéro, chambre, juge, avocat)
+        "header",
+        # Dispositif : juge souvent nommé ici même quand le header est anonymisé
+        "dispositif", "dictum",
+        # Sections structurelles FR/NL (fallback si header absent)
         "corps_arret", "faits_invokes", "feitenrelaas",
         "acte_attaque", "bestreden_beslissing",
         "cadre_juridique", "juridisch_kader",
-        "dispositif", "dictum",
-        # Anciens (fallback)
-        "identite", "procedure", "dispositif",
+        # Anciens (fallback arrêts pré-Phase-1)
+        "identite", "procedure",
     ],
     "procedure": [
         "cadre_juridique", "juridisch_kader",
@@ -42,6 +53,8 @@ GROUP_SECTIONS: dict[str, list[str]] = {
         "procedure", "faits", "decision_attaquee",
     ],
     "identity": [
+        # Header en premier : nationalité souvent uniquement là pour les arrêts non-DPI courts
+        "header",
         "faits_invokes", "feitenrelaas",
         "corps_arret", "corps_uitspraak",
         "these_partie_requerante", "standpunt_verzoekende_partij",
@@ -56,6 +69,7 @@ GROUP_SECTIONS: dict[str, list[str]] = {
         "faits", "identite", "arguments", "credibilite",
     ],
     "decision_reasoning": [
+        # Sections spécifiques nommées (priorité absolue — courtes et ciblées)
         "article_48_7", "artikel_48_7",
         "article_3_cedh", "artikel_3_evrm",
         "article_8_cedh", "artikel_8_evrm",
@@ -64,9 +78,14 @@ GROUP_SECTIONS: dict[str, list[str]] = {
         "beoordeling_vluchtelingenstatus",
         "beoordeling_subsidiaire_bescherming",
         "beoordeling",
+        # Raisonnement CCE en fallback : souvent dans acte_attaque ou conclusion_cgra_ou_oe
+        # Ces sections DOIVENT précéder motivation_cgra_ou_oe (très longue) pour être incluses
+        "acte_attaque", "bestreden_beslissing",
+        "conclusion_cgra_ou_oe", "conclusie_cgvs_of_dv",
+        # Motivation CGRA (longue — arrivera tronquée mais partiellement utile)
         "motivation_cgra_ou_oe", "motivering_cgvs_of_dv",
         "dispositif", "dictum",
-        "analyse", "credibilite", "arguments",
+        "analyse", "cadre_juridique", "credibilite", "arguments",
     ],
     "persecution_claims": [
         "faits_invokes", "feitenrelaas",
@@ -77,6 +96,8 @@ GROUP_SECTIONS: dict[str, list[str]] = {
         "arguments", "faits", "analyse",
     ],
     "evidence_documents": [
+        # acte_attaque contient souvent l'inventaire COI
+        "acte_attaque", "bestreden_beslissing",
         "motivation_cgra_ou_oe", "motivering_cgvs_of_dv",
         "conclusion_cgra_ou_oe", "conclusie_cgvs_of_dv",
         "nouveaux_elements", "nieuwe_elementen",
@@ -117,6 +138,21 @@ Valeurs autorisées pour "status" :
   inferred        = information déduite indirectement (pas citée explicitement)
   conflicting     = informations contradictoires entre sections
   error           = impossible d'analyser ce critère
+
+Détection du type de procédure (important pour not_applicable) :
+- Si l'arrêt concerne UNIQUEMENT le séjour (OQT, 9bis, Dublin, visa étudiant, regroupement familial, cohabitation légale) et NON une DPI (demande de protection internationale/asile), utilise status="not_applicable" pour les critères exclusivement liés à l'asile : MGF/VGV, mariage forcé, crainte de persécution, crédibilité du récit d'asile, art. 48/7, agents de persécution, protection nationale au sens DPI, groupe social art. 48/3, durée procédure DPI.
+- Les critères de métadonnées (date, numéro, juge, avocat, chambre) et la nationalité restent applicables à TOUS les types d'arrêts.
+- Indices d'un arrêt NON-DPI : absence de "CGRA/CGVS", présence d'"OQT" / "ordre de quitter le territoire" / "9bis" / "Dublin" / "séjour étudiant" comme objet principal.
+
+Numéro d'arrêt :
+- Le numéro de l'ARRÊT EXAMINÉ figure en première ou deuxième ligne du document : "n° XXX XXX du" (FR) ou "nr. XXX XXX van" (NL).
+- Si une ligne mentionne un arrêt correctif ("VERBETERD DOOR HET ARREST NR..."), ignore ce numéro — il désigne un arrêt différent.
+- Ne jamais retourner le numéro d'un autre arrêt cité dans le corps du texte (ex. "arrêt n° 281 845 du..." cité comme précédent).
+
+VGV (critères NL uniquement) :
+- VGV = Vrouwelijke Genitale Verminking = Mutilations Génitales Féminines (MGF en français).
+- Ce critère concerne UNIQUEMENT les mutilations génitales féminines, pas d'autres formes de persécution.
+- Si le sujet n'est pas abordé dans l'arrêt, retourner status="not_mentioned".
 """
 
 
@@ -130,6 +166,7 @@ def select_sections(
     Appelle get_sections_for_criteria_group() puis applique le plafond de caractères.
     Si aucune section ne correspond, retourne toutes les sections (fallback).
     """
+    effective_max = GROUP_MAX_CHARS.get(group, max_chars)
     section_ids = GROUP_SECTIONS.get(group, [])
     candidates = intermediate.get_sections_for_criteria_group(section_ids)
 
@@ -144,8 +181,8 @@ def select_sections(
         text = (sec.text or "").strip()
         if not text:
             continue
-        if total + len(text) > max_chars:
-            remaining = max_chars - total
+        if total + len(text) > effective_max:
+            remaining = effective_max - total
             if remaining > 200:
                 result.append(replace(sec, text=text[:remaining] + "\n[… tronqué …]"))
             break

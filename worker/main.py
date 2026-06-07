@@ -68,11 +68,12 @@ def _save_intermediate(doc: IntermediateDocument, arret_id: str) -> Path:
 # Opérations Supabase
 # ---------------------------------------------------------------------------
 
-def fetch_pending(client, limit: int) -> list[dict]:
+def fetch_pending(client, limit: int, reprocess: bool = False) -> list[dict]:
+    statuts = ["termine", "erreur"] if reprocess else ["en_attente"]
     res = (
         client.table("arrets")
         .select("id, numero, pdf_url, langue")
-        .eq("statut_traitement", "en_attente")
+        .in_("statut_traitement", statuts)
         .limit(limit)
         .execute()
     )
@@ -231,13 +232,14 @@ def run_single_url(url: str, dry_run: bool) -> None:
     )
 
 
-def run_batch(limit: int, dry_run: bool) -> None:
+def run_batch(limit: int, dry_run: bool, reprocess: bool = False) -> None:
     client = _get_supabase_client()
-    arrets = fetch_pending(client, limit)
+    arrets = fetch_pending(client, limit, reprocess=reprocess)
     if not arrets:
-        print("Aucun arrêt en attente.")
+        label = "en attente" if not reprocess else "à retraiter (termine/erreur)"
+        print(f"Aucun arrêt {label}.")
         return
-    print(f"{len(arrets)} arrêt(s) à traiter (limite={limit}, dry_run={dry_run})")
+    print(f"{len(arrets)} arrêt(s) à traiter (limite={limit}, dry_run={dry_run}, reprocess={reprocess})")
     ok = 0
     for arret in arrets:
         # Nouvelle connexion par arrêt : évite les Broken pipe sur connexion HTTP/2 idle
@@ -256,15 +258,18 @@ def run_batch(limit: int, dry_run: bool) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Worker local d'extraction PDF CCE/RVV")
-    parser.add_argument("--url",      help="URL d'un PDF public à tester (mode test manuel)")
-    parser.add_argument("--limit",    type=int, default=5, help="Nb max d'arrêts à traiter (défaut : 5)")
-    parser.add_argument("--dry-run",  action="store_true", help="Extraction sans écriture en base")
+    parser.add_argument("--url",        help="URL d'un PDF public à tester (mode test manuel)")
+    parser.add_argument("--limit",      type=int, default=5, help="Nb max d'arrêts à traiter (défaut : 5)")
+    parser.add_argument("--dry-run",    action="store_true", help="Extraction sans écriture en base")
+    parser.add_argument("--reprocess",  action="store_true",
+                        help="Retraiter les arrêts déjà extraits (statut=termine/erreur) "
+                             "pour regénérer leur intermediate_json avec les regex améliorées")
     args = parser.parse_args()
 
     if args.url:
         run_single_url(args.url, dry_run=True)
     else:
-        run_batch(limit=args.limit, dry_run=args.dry_run)
+        run_batch(limit=args.limit, dry_run=args.dry_run, reprocess=args.reprocess)
 
 
 if __name__ == "__main__":

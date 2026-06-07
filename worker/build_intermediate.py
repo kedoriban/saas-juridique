@@ -69,7 +69,8 @@ class MetadataDetected:
     defendant: str | None
     appeal_date: str | None
     attacked_decision_date: str | None
-    extraction_notes: list[str]
+    chambre: str | None = None
+    extraction_notes: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -152,6 +153,7 @@ class IntermediateDocument:
                 defendant=m.get("defendant"),
                 appeal_date=m.get("appeal_date"),
                 attacked_decision_date=m.get("attacked_decision_date"),
+                chambre=m.get("chambre"),
                 extraction_notes=list(m.get("extraction_notes") or []),
             ),
             applicants_detection=ApplicantsDetection(
@@ -347,6 +349,7 @@ def build_intermediate(
         defendant=meta_result.defendant,
         appeal_date=meta_result.appeal_date,
         attacked_decision_date=meta_result.attacked_decision_date,
+        chambre=meta_result.chambre,
         extraction_notes=meta_result.extraction_notes,
     )
 

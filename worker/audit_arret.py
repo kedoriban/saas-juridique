@@ -2,10 +2,14 @@
 audit_arret.py — Compare le texte extrait (intermediate_json) avec les valeurs LLM stockées.
 Usage : python audit_arret.py 341995
 """
-import os, sys, json
+import os, sys, json, io
 from pathlib import Path
 from collections import defaultdict
 from dotenv import load_dotenv
+
+# Force UTF-8 sur stdout pour éviter le mangling dans les pipes PowerShell
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 load_dotenv(Path(__file__).parent.parent / ".env.local")
 from supabase import create_client

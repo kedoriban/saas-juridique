@@ -114,6 +114,28 @@ _RE_ATTACKED_DATE = re.compile(
 )
 
 # ---------------------------------------------------------------------------
+# Chambre (numéro romain + langue)
+# CCE : "Ière chambre francophone", "IIIème CHAMBRE", "Xe chambre"
+# RvV : "XIde kamer, Nederlandstalig", "IVde kamer"
+# ---------------------------------------------------------------------------
+_RE_CHAMBRE = re.compile(
+    # Numéro romain ≥ 2 chars (II, III, IV, VI, IX, XI...) OU I/V/X suivi d'un suffixe ordinal
+    # Exclut les faux positifs comme "V" seul dans "RvV"
+    r"\b("
+    r"(?:[IVXLC]{2,6}|[IVX](?:i?[eè]r?e?m?e?|de))"
+    r"(?:i?[eè]r?e?m?e?|de?)?"
+    r"\s+(?:chambre|kamer)"
+    r"(?:[,\s]+(?:francophone|n[eé]erlandophone|nederlandstalig))?)",
+    re.IGNORECASE,
+)
+
+# Numéro sans préfixe "arrêt/arrest" : "n° 341 968", "nr. 342 046"
+_RE_NUMBER_FALLBACK = re.compile(
+    r"\bn[°or]?\.?\s+(\d{3}[\s.]\d{3}|\d{6,7})\b",
+    re.IGNORECASE,
+)
+
+# ---------------------------------------------------------------------------
 # Institution défenderesse
 # ---------------------------------------------------------------------------
 _DEFENDANTS: list[tuple[re.Pattern[str], str]] = [
@@ -141,6 +163,7 @@ class MetadataExtractionResult:
     defendant: str | None = None
     appeal_date: str | None = None
     attacked_decision_date: str | None = None
+    chambre: str | None = None
     extraction_notes: list[str] = field(default_factory=list)
 
 
@@ -172,12 +195,20 @@ def extract_metadata(
         raw_num = _clean_number(m.group(1))
         result.decision_number = raw_num
         result.decision_id = f"A{raw_num}"
-    elif pdf_url:
-        m_url = _RE_URL_NUMBER.search(pdf_url)
-        if m_url:
-            result.decision_number = m_url.group(1)
-            result.decision_id = f"A{m_url.group(1)}"
-            result.extraction_notes.append("decision_number extrait depuis l'URL (non trouvé dans le texte)")
+    else:
+        # Fallback : "n° 341 968" sans préfixe "arrêt/arrest"
+        m = _RE_NUMBER_FALLBACK.search(text[:500])
+        if m:
+            raw_num = _clean_number(m.group(1))
+            result.decision_number = raw_num
+            result.decision_id = f"A{raw_num}"
+            result.extraction_notes.append("decision_number extrait sans préfixe arrêt/arrest")
+        elif pdf_url:
+            m_url = _RE_URL_NUMBER.search(pdf_url)
+            if m_url:
+                result.decision_number = m_url.group(1)
+                result.decision_id = f"A{m_url.group(1)}"
+                result.extraction_notes.append("decision_number extrait depuis l'URL (non trouvé dans le texte)")
 
     # ------------------------------------------------------------------
     # Date de l'arrêt
@@ -205,15 +236,24 @@ def extract_metadata(
         if m:
             result.judge = m.group(1).strip()
             result.extraction_notes.append("judge extrait par titre (PRESENT non trouvé)")
+    if not result.judge:
+        # Fallback : dispositif / signature en fin d'arrêt (nom non anonymisé même sur PDF CCE publié)
+        m = _RE_JUDGE_TITLE.search(text[-2000:])
+        if m:
+            result.judge = m.group(1).strip()
+            result.extraction_notes.append("judge extrait depuis le dispositif/signature (fin du texte)")
 
     # ------------------------------------------------------------------
     # Avocat — souvent en début d'arrêt dans la désignation des parties
     # ------------------------------------------------------------------
+    lawyers: list[str] = []
     for m in _RE_LAWYER.finditer(text[:3000]):
         name = m.group(1).strip().rstrip(".")
         if len(name) >= 2:
-            result.lawyer = name
-            break
+            entry = f"Me {name}"
+            if entry not in lawyers:
+                lawyers.append(entry)
+    result.lawyer = " ; ".join(lawyers) if lawyers else None
 
     # ------------------------------------------------------------------
     # Institution défenderesse
@@ -222,6 +262,13 @@ def extract_metadata(
         if pattern.search(text):
             result.defendant = label
             break
+
+    # ------------------------------------------------------------------
+    # Chambre (numéro romain, non anonymisé dans les PDF CCE/RvV publiés)
+    # ------------------------------------------------------------------
+    m = _RE_CHAMBRE.search(text[:1500])
+    if m:
+        result.chambre = m.group(1).strip()
 
     # ------------------------------------------------------------------
     # Date d'introduction du recours
