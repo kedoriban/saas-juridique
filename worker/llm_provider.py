@@ -127,6 +127,8 @@ class LLMResponse:
     duration_ms: int
     prompt_chars: int
     error: str | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
 
 
 class LLMProvider(ABC):
@@ -248,11 +250,13 @@ class VLLMProvider(LLMProvider):
 
     def __init__(self) -> None:
         self.base_url = os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1").rstrip("/")
-        self.model = os.environ.get("VLLM_MODEL", "Qwen/Qwen2.5-32B-Instruct-AWQ")
+        self.model = os.environ.get("VLLM_MODEL", "Qwen/Qwen2.5-72B-Instruct-AWQ")
         self.api_key = os.environ.get("VLLM_API_KEY", "")
         self.timeout = int(os.environ.get("LLM_TIMEOUT_SECONDS", "180"))
-        self.max_input_chars = int(os.environ.get("LLM_MAX_INPUT_CHARS", "8000"))
-        self.max_output_tokens = int(os.environ.get("LLM_MAX_OUTPUT_TOKENS", "3000"))
+        # Limite haute volontairement pour éviter la troncature du user_prompt ;
+        # vLLM gère lui-même la fenêtre de contexte (max_model_len).
+        self.max_input_chars = int(os.environ.get("LLM_MAX_INPUT_CHARS", "32000"))
+        self.max_output_tokens = int(os.environ.get("LLM_MAX_OUTPUT_TOKENS", "4096"))
 
     def complete(
         self,
@@ -271,6 +275,9 @@ class VLLMProvider(LLMProvider):
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": user_prompt})
+        # Prefilling : même technique que OllamaProvider — force la structure JSON
+        # dès le premier token, réduit la latence et les tokens de sortie.
+        messages.append({"role": "assistant", "content": '{"items":['})
 
         payload: dict[str, Any] = {
             "model": self.model,
@@ -321,18 +328,28 @@ class VLLMProvider(LLMProvider):
                 error=f"Reponse vLLM inattendue : {exc}",
             )
 
+        # Reconstituer la réponse complète avec le prefilling injecté
+        raw_text = '{"items":[' + content
+
+        # Token usage (disponible dans les réponses vLLM)
+        usage = data.get("usage") or {}
+        prompt_tokens = usage.get("prompt_tokens")
+        completion_tokens = usage.get("completion_tokens")
+
         # guided_json garantit normalement un JSON valide ; fallback robuste sinon
-        parsed = _try_parse(content)
+        parsed = _try_parse(raw_text)
         error = None
         if parsed is None:
-            parsed, error = _extract_json(content)
+            parsed, error = _extract_json(raw_text)
         return LLMResponse(
-            raw_text=content,
+            raw_text=raw_text,
             parsed=parsed,
             model=self.model,
             duration_ms=duration_ms,
             prompt_chars=prompt_chars,
             error=error,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
         )
 
 

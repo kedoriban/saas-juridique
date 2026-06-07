@@ -45,6 +45,9 @@ export interface Criterion {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  // Migration 009
+  statut?: "actif" | "archive";
+  effet_date?: string | null;
 }
 
 export interface Arret {
@@ -62,6 +65,12 @@ export interface Arret {
   language_detected: string | null;
   created_at: string;
   updated_at: string;
+  // Migration 009
+  is_focus: boolean;
+  source_juridiction: string | null;
+  type_decision: "annulation" | "plein_contentieux" | "confirmation" | "refus" | "irrecevabilite" | "autre" | null;
+  resume_ai: string | null;
+  tags: string[];
 }
 
 export type ValidationStatus = "correct" | "incorrect" | "incertain" | "absent" | "a_revoir";

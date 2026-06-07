@@ -6,9 +6,10 @@ import { logout } from "@/app/actions/auth";
 import {
   IconHome,
   IconDocument,
-  IconSearch,
-  IconCheckSquare,
+  IconBookmark,
+  IconArrowUpTray,
   IconChart,
+  IconCheckSquare,
   IconSettings,
   IconLogout,
 } from "@/components/icons";
@@ -16,14 +17,17 @@ import {
 const mainNav = [
   { href: "/dashboard", label: "Tableau de bord", Icon: IconHome },
   { href: "/arrets",    label: "Arrêts",          Icon: IconDocument },
-  { href: "/recherche", label: "Recherche",        Icon: IconSearch },
-  { href: "/stats",     label: "Statistiques",     Icon: IconChart },
+  { href: "/stats",     label: "Statistiques",    Icon: IconChart },
+];
+
+const disabledNav = [
+  { label: "Focus",  Icon: IconBookmark },
+  { label: "Export", Icon: IconArrowUpTray },
 ];
 
 const adminNav = [
-  { href: "/validation", label: "Validation",  Icon: IconCheckSquare },
-  { href: "/criteres",   label: "Critères",    Icon: IconCheckSquare },
-  { href: "/parametres", label: "Paramètres",  Icon: IconSettings },
+  { href: "/criteres",   label: "Administration", Icon: IconCheckSquare },
+  { href: "/parametres", label: "Paramètres",     Icon: IconSettings },
 ];
 
 function NavItem({
@@ -53,6 +57,24 @@ function NavItem({
   );
 }
 
+function NavItemDisabled({
+  label,
+  Icon,
+}: {
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div
+      title="Disponible prochainement"
+      className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/30 cursor-not-allowed select-none"
+    >
+      <Icon className="w-4 h-4 shrink-0" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
 export default function Sidebar({
   userEmail,
   userRole,
@@ -79,6 +101,9 @@ export default function Sidebar({
       <nav className="flex flex-col gap-1">
         {mainNav.map((item) => (
           <NavItem key={item.href} {...item} />
+        ))}
+        {disabledNav.map((item) => (
+          <NavItemDisabled key={item.label} {...item} />
         ))}
       </nav>
 

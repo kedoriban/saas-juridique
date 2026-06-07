@@ -13,6 +13,7 @@ Statuts canoniques (7) :
 
 from __future__ import annotations
 
+import copy
 import json
 from typing import Any
 
@@ -78,6 +79,23 @@ STATUS_MAP: dict[str, str] = {
 _REVIEW_STATUSES = {"ambiguous", "conflicting", "error", "inferred"}
 
 
+_MAX_EVIDENCE_CHARS = 150
+
+
+def build_schema_for_group(valid_ids: list[str]) -> dict:
+    """
+    Retourne une copie de RESPONSE_SCHEMA avec criterion_id contraint à l'enum
+    des IDs valides pour ce groupe. Élimine les hallucinations d'ID avec guided_json.
+    """
+    schema = copy.deepcopy(RESPONSE_SCHEMA)
+    if valid_ids:
+        schema["properties"]["items"]["items"]["properties"]["criterion_id"] = {
+            "type": "string",
+            "enum": valid_ids,
+        }
+    return schema
+
+
 def normalize_response(
     data: dict,
     arret_id: str,
@@ -108,6 +126,10 @@ def normalize_response(
                 item["value"] = ", ".join(str(x) for x in val if x is not None) or None
             elif val is not None and not isinstance(val, str):
                 item["value"] = str(val)
+            # Tronquer evidence_excerpt pour respecter la limite déclarée dans le prompt
+            exc = item.get("evidence_excerpt")
+            if isinstance(exc, str) and len(exc) > _MAX_EVIDENCE_CHARS:
+                item["evidence_excerpt"] = exc[:_MAX_EVIDENCE_CHARS]
         return data
 
     # Format plat historique

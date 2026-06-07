@@ -1,79 +1,113 @@
 import Link from "next/link";
 import type { Arret } from "@/lib/types";
+import { TagPill } from "@/components/TagPill";
+import ArretRowMenu from "@/components/ArretRowMenu";
 
 const LANGUE_STYLE: Record<string, string> = {
   fr: "bg-blue-50 text-blue-700",
   nl: "bg-orange-50 text-orange-700",
 };
-const STATUT_DOT: Record<string, string> = {
-  en_attente: "bg-gray-300",
-  en_cours: "bg-yellow-400",
-  termine: "bg-forest-400",
-  erreur: "bg-red-400",
+
+const PROCEDURE_LABELS: Record<string, string> = {
+  asile: "Asile",
+  annulation: "Annulation",
+  plein_contentieux: "Plein cont.",
+  autre: "Autre",
 };
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("fr-BE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  try {
+    return new Date(iso).toLocaleDateString("fr-BE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function formatProcedure(pt: string | null): string {
+  if (!pt) return "—";
+  return PROCEDURE_LABELS[pt] ?? pt.charAt(0).toUpperCase() + pt.slice(1);
 }
 
 export default function ArretTableRow({ arret }: { arret: Arret }) {
   return (
     <tr className="hover:bg-gray-50/70 transition-colors group">
-      <td className="px-6 py-4 align-top">
+      {/* N° Arrêt */}
+      <td className="px-6 py-3.5 align-middle whitespace-nowrap">
         <Link href={`/arrets/${arret.id}`} className="block">
-          <span className="font-semibold text-gray-900 group-hover:text-forest-600 transition-colors text-sm">
+          <span className="font-semibold text-sm text-gray-900 group-hover:text-forest-600 transition-colors">
             {arret.numero}
           </span>
-          <div className="flex items-center gap-1.5 mt-1.5">
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUT_DOT[arret.statut_traitement] ?? "bg-gray-300"}`} />
-            <span className="text-xs text-gray-400 tabular-nums">{formatDate(arret.date_arret)}</span>
-          </div>
+          {arret.is_focus && (
+            <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">
+              ★
+            </span>
+          )}
         </Link>
       </td>
-      <td className="px-4 py-4 align-top max-w-xs">
+
+      {/* Résumé + tags */}
+      <td className="px-4 py-3.5 align-middle max-w-xs">
         <Link href={`/arrets/${arret.id}`} className="block">
           {arret.resume ? (
-            <p className="text-sm text-gray-700 line-clamp-2 leading-relaxed">{arret.resume}</p>
+            <p className="text-sm text-gray-700 line-clamp-2 leading-relaxed">
+              {arret.resume}
+            </p>
           ) : (
             <span className="text-sm text-gray-300 italic">—</span>
           )}
-        </Link>
-      </td>
-      <td className="px-4 py-4 align-top">
-        <Link href={`/arrets/${arret.id}`} className="block">
-          {arret.matiere ? (
-            <span className="inline-block text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md">
-              {arret.matiere}
-            </span>
-          ) : (
-            <span className="text-gray-300">—</span>
+          {arret.tags?.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {arret.tags.map((t) => (
+                <TagPill key={t} tag={t} />
+              ))}
+            </div>
           )}
         </Link>
       </td>
-      <td className="px-4 py-4 align-top">
-        <Link href={`/arrets/${arret.id}`} className="block">
-          <span className="text-sm text-gray-600">
-            {arret.chambre ?? <span className="text-gray-300">—</span>}
-          </span>
-        </Link>
+
+      {/* Procédure */}
+      <td className="px-4 py-3.5 align-middle whitespace-nowrap">
+        <span className="text-xs text-gray-600">
+          {formatProcedure(arret.procedure_type)}
+        </span>
       </td>
-      <td className="px-4 py-4 align-top">
-        <Link href={`/arrets/${arret.id}`} className="block">
-          <span className="text-sm text-gray-600 tabular-nums whitespace-nowrap">
-            {formatDate(arret.date_arret)}
-          </span>
-        </Link>
+
+      {/* Source juridiction */}
+      <td className="px-4 py-3.5 align-middle whitespace-nowrap">
+        <span className="text-xs text-gray-500">
+          {arret.source_juridiction ?? "—"}
+        </span>
       </td>
-      <td className="px-4 py-4 align-top">
-        <Link href={`/arrets/${arret.id}`} className="block">
-          <span className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-md ${LANGUE_STYLE[arret.langue] ?? "bg-gray-100 text-gray-500"}`}>
-            {arret.langue?.toUpperCase()}
-          </span>
-        </Link>
+
+      {/* Date */}
+      <td className="px-4 py-3.5 align-middle whitespace-nowrap">
+        <span className="text-xs text-gray-500 tabular-nums">
+          {formatDate(arret.date_arret)}
+        </span>
+      </td>
+
+      {/* Langue */}
+      <td className="px-4 py-3.5 align-middle whitespace-nowrap">
+        <span
+          className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-md ${
+            LANGUE_STYLE[arret.langue] ?? "bg-gray-100 text-gray-500"
+          }`}
+        >
+          {arret.langue?.toUpperCase()}
+        </span>
+      </td>
+
+      {/* Actions */}
+      <td className="px-3 py-3.5 align-middle w-10">
+        <ArretRowMenu
+          arretId={arret.id}
+          isFocus={arret.is_focus}
+          pdfUrl={arret.pdf_url}
+        />
       </td>
     </tr>
   );

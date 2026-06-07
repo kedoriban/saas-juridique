@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconHome, IconDocument, IconSearch, IconCheckSquare, IconChart } from "@/components/icons";
+import { IconHome, IconDocument, IconBookmark, IconChart } from "@/components/icons";
 
 const navItems = [
   { href: "/dashboard", label: "Accueil", Icon: IconHome },
-  { href: "/arrets", label: "Arrêts", Icon: IconDocument },
-  { href: "/recherche", label: "Recherche", Icon: IconSearch },
-  { href: "/validation", label: "Validation", Icon: IconCheckSquare },
-  { href: "/stats", label: "Stats", Icon: IconChart },
+  { href: "/arrets",    label: "Arrêts",  Icon: IconDocument },
+  { href: "/stats",     label: "Stats",   Icon: IconChart },
 ];
 
 export default function BottomNav() {
@@ -38,6 +36,14 @@ export default function BottomNav() {
             </Link>
           );
         })}
+        {/* Focus — désactivé V1 */}
+        <div
+          title="Disponible prochainement"
+          className="flex-1 flex flex-col items-center justify-center gap-1 pt-1 pb-2 text-gray-200 cursor-not-allowed select-none"
+        >
+          <IconBookmark className="w-5 h-5" />
+          <span className="text-[10px] leading-none font-medium">Focus</span>
+        </div>
       </div>
     </nav>
   );

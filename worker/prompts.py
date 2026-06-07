@@ -96,7 +96,6 @@ GROUP_SECTIONS: dict[str, list[str]] = {
 }
 
 SYSTEM_PROMPT = """\
-/no_think
 Tu es un extracteur de données juridiques. Tu lis des sections d'arrêts belges du CCE/RVV annotées par leur autorité source, et tu extrais des critères précis.
 
 Règles ABSOLUES :
@@ -108,6 +107,7 @@ Règles ABSOLUES :
 - evidence_excerpt : citation courte (max 150 car.) copiée mot pour mot de la section.
 - source_authority : autorité de la section où tu trouves l'information (CCE, RvV, CGRA, CGVS, OE, DVZ, applicant, unknown).
 - source_section : section_id de la section source (ex: "article_48_7", "faits_invokes").
+- source_authority : UNIQUEMENT une de ces valeurs exactes : CCE, RvV, CGRA, CGVS, OE, DVZ, applicant, unknown.
 
 Valeurs autorisées pour "status" :
   found           = information clairement présente

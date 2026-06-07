@@ -35,7 +35,7 @@ _ENV_PATH = Path(__file__).parent.parent / ".env.local"
 load_dotenv(dotenv_path=_ENV_PATH)
 
 from llm_provider import get_provider, LLMResponse
-from schemas import RESPONSE_SCHEMA, PROMPT_VERSION, validate_response, normalize_response
+from schemas import RESPONSE_SCHEMA, PROMPT_VERSION, validate_response, normalize_response, build_schema_for_group
 from prompts import build_prompt, select_sections
 from build_intermediate import (
     IntermediateDocument, DocumentInfo, ExtractionQuality,
@@ -80,22 +80,24 @@ def fetch_pending_analyze(client, limit: int) -> list[dict]:
         client.table("arrets")
         .select("id, numero, langue, pdf_url")
         .eq("statut_traitement", "termine")
-        .limit(limit)
+        .limit(limit * 2)  # marge : certains seront déjà analysés
         .execute()
     )
     arrets = res.data or []
-    result = []
-    for a in arrets:
-        check = (
-            client.table("arret_criteria_values")
-            .select("id")
-            .eq("arret_id", a["id"])
-            .limit(1)
-            .execute()
-        )
-        if not check.data:
-            result.append(a)
-    return result
+    if not arrets:
+        return []
+
+    # Récupérer en une seule requête les IDs déjà analysés (évite N+1)
+    arret_ids = [a["id"] for a in arrets]
+    done_res = (
+        client.table("arret_criteria_values")
+        .select("arret_id")
+        .in_("arret_id", arret_ids)
+        .limit(len(arret_ids) * 10)
+        .execute()
+    )
+    done_ids = {d["arret_id"] for d in (done_res.data or [])}
+    return [a for a in arrets if a["id"] not in done_ids][:limit]
 
 
 def fetch_segments(client, arret_id: str) -> list[dict]:
@@ -139,6 +141,8 @@ def store_model_run(
     status: str,
     criteria_version: str = "",
     prompt_version: str = "",
+    prompt_tokens: int | None = None,
+    completion_tokens: int | None = None,
 ) -> str:
     res = client.table("model_runs").insert({
         "arret_id":                arret_id,
@@ -146,8 +150,8 @@ def store_model_run(
         "model_version":           model,
         "duration_ms":             duration_ms,
         "status":                  status,
-        "prompt_tokens":           None,
-        "completion_tokens":       None,
+        "prompt_tokens":           prompt_tokens,
+        "completion_tokens":       completion_tokens,
         "criteria_schema_version": criteria_version or None,
         "analysis_prompt_version": prompt_version or None,
     }).execute()
@@ -160,7 +164,8 @@ def store_criteria_values(
     items: list[dict],
     model_run_id: str,
 ) -> None:
-    """Stocke les valeurs extraites. Requiert migration 008 pour les nouveaux champs."""
+    """Stocke les valeurs extraites en batch (1 requête au lieu de N)."""
+    rows = []
     for item in items:
         if not item.get("criterion_id"):
             continue
@@ -172,19 +177,20 @@ def store_criteria_values(
                 value_boolean, value_text = True, None
             elif token in BOOL_FALSE:
                 value_boolean, value_text = False, None
-        row = {
-            "arret_id":          arret_id,
-            "criterion_id":      item["criterion_id"],
-            "value_text":        value_text,
-            "value_boolean":     value_boolean,
-            "confidence":        item.get("confidence"),
-            "evidence_excerpt":  item.get("evidence_excerpt"),
-            "model_run_id":      model_run_id,
-            "source_authority":  item.get("source_authority"),
-            "source_section":    item.get("source_section"),
+        rows.append({
+            "arret_id":           arret_id,
+            "criterion_id":       item["criterion_id"],
+            "value_text":         value_text,
+            "value_boolean":      value_boolean,
+            "confidence":         item.get("confidence"),
+            "evidence_excerpt":   item.get("evidence_excerpt"),
+            "model_run_id":       model_run_id,
+            "source_authority":   item.get("source_authority"),
+            "source_section":     item.get("source_section"),
             "needs_human_review": item.get("needs_human_review", False),
-        }
-        client.table("arret_criteria_values").upsert(row, on_conflict="arret_id,criterion_id").execute()
+        })
+    if rows:
+        client.table("arret_criteria_values").upsert(rows, on_conflict="arret_id,criterion_id").execute()
 
 
 def store_processing_job(client, arret_id: str, status: str, error: str | None = None) -> None:
@@ -358,10 +364,13 @@ def analyze_group(
 
     valid_ids  = {c["id"] for c in criteria}
     type_by_id = {c["id"]: c.get("expected_value_type") for c in criteria}
+    # Schéma JSON avec criterion_id contraint à l'enum des IDs valides →
+    # élimine les hallucinations d'ID avec guided_json (vLLM).
+    group_schema = build_schema_for_group(list(valid_ids))
     last_response: LLMResponse | None = None
 
     for attempt in range(MAX_RETRIES + 1):
-        response = provider.complete(prompt, json_schema=RESPONSE_SCHEMA)
+        response = provider.complete(prompt, json_schema=group_schema)
         last_response = response
 
         if response.error and not response.parsed:
@@ -441,6 +450,7 @@ def analyze_arret(
             return False
 
     all_items: list[dict] = []
+    all_responses: list[LLMResponse] = []
     total_duration_ms = 0
 
     for group, group_criteria in groups.items():
@@ -458,14 +468,21 @@ def analyze_arret(
 
         if response:
             total_duration_ms += response.duration_ms
+            all_responses.append(response)
+            tok_info = ""
+            if response.prompt_tokens:
+                tok_info = f" | {response.prompt_tokens}+{response.completion_tokens}tok"
             status_label = "OK" if items else "ERREUR"
-            print(f"     {status_label} — {len(items)} items — {response.duration_ms}ms")
+            print(f"     {status_label} — {len(items)} items — {response.duration_ms}ms{tok_info}")
         else:
             print(f"     SKIP (aucune section)")
 
         all_items.extend(items)
 
-    print(f"  Total : {len(all_items)} valeurs extraites en {total_duration_ms}ms")
+    total_prompt_tokens = sum(r.prompt_tokens or 0 for r in all_responses) or None
+    total_completion_tokens = sum(r.completion_tokens or 0 for r in all_responses) or None
+    print(f"  Total : {len(all_items)} valeurs extraites en {total_duration_ms}ms"
+          + (f" | tokens: {total_prompt_tokens}+{total_completion_tokens}" if total_prompt_tokens else ""))
 
     if dry_run:
         print("  → dry-run, rien stocké.")
@@ -488,6 +505,8 @@ def analyze_arret(
         status="done" if all_items else "error",
         criteria_version=criterion_version,
         prompt_version=PROMPT_VERSION,
+        prompt_tokens=total_prompt_tokens,
+        completion_tokens=total_completion_tokens,
     )
 
     if all_items:

@@ -54,3 +54,99 @@ export function formatDateBE(iso: string): string {
     year: "numeric",
   });
 }
+
+/**
+ * Derive the Figma badge status from criteria value fields.
+ * "confirme"       : value_boolean true + confidence > 0.7
+ * "applicable"     : value_boolean true + confidence ≤ 0.7, or value_text only
+ * "non_applicable" : value_boolean false
+ * null             : no extractable value
+ */
+export function deriveCriteriaStatus(
+  valueBoolean: boolean | null,
+  valueText: string | null,
+  confidence: number | null
+): "confirme" | "applicable" | "non_applicable" | null {
+  if (valueBoolean === false) return "non_applicable";
+  if (valueBoolean === true) {
+    return confidence !== null && confidence > 0.7 ? "confirme" : "applicable";
+  }
+  if (valueText) return "applicable";
+  return null;
+}
+
+// Mapping: normalized French country name → flag emoji (ISO 3166-1 alpha-2)
+const FLAG_MAP: Record<string, string> = {
+  afghanistan: "🇦🇫",
+  albanie: "🇦🇱",
+  algerie: "🇩🇿",
+  angola: "🇦🇴",
+  armenie: "🇦🇲",
+  azerbaidjan: "🇦🇿",
+  azerbaïdjan: "🇦🇿",
+  bangladesh: "🇧🇩",
+  bielarus: "🇧🇾",
+  bielorrussie: "🇧🇾",
+  bielorussie: "🇧🇾",
+  cameroun: "🇨🇲",
+  "cote d'ivoire": "🇨🇮",
+  "cote divoire": "🇨🇮",
+  croatie: "🇭🇷",
+  "republique democratique du congo": "🇨🇩",
+  "rdc": "🇨🇩",
+  "congo": "🇨🇬",
+  egypte: "🇪🇬",
+  erythree: "🇪🇷",
+  ethiopie: "🇪🇹",
+  georgie: "🇬🇪",
+  ghana: "🇬🇭",
+  guinee: "🇬🇳",
+  inde: "🇮🇳",
+  irak: "🇮🇶",
+  iran: "🇮🇷",
+  kazakhstan: "🇰🇿",
+  kosovo: "🇽🇰",
+  libye: "🇱🇾",
+  mali: "🇲🇱",
+  maroc: "🇲🇦",
+  mauritanie: "🇲🇷",
+  moldova: "🇲🇩",
+  mongolie: "🇲🇳",
+  nigeria: "🇳🇬",
+  pakistan: "🇵🇰",
+  palestine: "🇵🇸",
+  "philippines": "🇵🇭",
+  russie: "🇷🇺",
+  rwanda: "🇷🇼",
+  senegal: "🇸🇳",
+  serbie: "🇷🇸",
+  "sierra leone": "🇸🇱",
+  somalie: "🇸🇴",
+  soudan: "🇸🇩",
+  "soudan du sud": "🇸🇸",
+  syrie: "🇸🇾",
+  tanzanie: "🇹🇿",
+  togo: "🇹🇬",
+  turquie: "🇹🇷",
+  ukraine: "🇺🇦",
+  venezuela: "🇻🇪",
+  yemen: "🇾🇪",
+  zimbabwe: "🇿🇼",
+};
+
+/**
+ * Return a flag emoji for a French country name, or empty string if unknown.
+ */
+export function countryFlag(name: string): string {
+  if (!name) return "";
+  const normalized = name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim();
+  return (
+    FLAG_MAP[normalized] ??
+    FLAG_MAP[normalized.split(/[\s,()]+/)[0]] ??
+    ""
+  );
+}
