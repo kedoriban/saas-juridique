@@ -76,10 +76,10 @@ print(f"Arrêts de référence trouvés : {len(arrets)}/8")
 # --------------------------------------------------------------------------
 # 2. Récupérer tous les critères actifs avec leur groupe
 # --------------------------------------------------------------------------
-crit_res = sb.table("criteria").select("id, slug, label_original, llm_group, langue, active").eq("active", True).execute()
+crit_res = sb.table("criteria").select("id, slug, label_original, llm_group, language, active").eq("active", True).execute()
 criteria_by_id = {c["id"]: c for c in crit_res.data}
-total_criteria_fr = sum(1 for c in crit_res.data if c["langue"] == "fr")
-total_criteria_nl = sum(1 for c in crit_res.data if c["langue"] == "nl")
+total_criteria_fr = sum(1 for c in crit_res.data if c["language"] == "fr")
+total_criteria_nl = sum(1 for c in crit_res.data if c["language"] == "nl")
 
 # --------------------------------------------------------------------------
 # 3. Récupérer toutes les valeurs pour les 8 arrêts
@@ -111,7 +111,8 @@ global_total = 0
 for arret_id, info in sorted(arrets.items(), key=lambda x: x[1]["numero"]):
     num = info["numero"]
     lang = info["langue"]
-    total_crit = total_criteria_fr if lang == "fr" else total_criteria_nl
+    lang_key = lang if lang in ("fr", "nl") else "fr"
+    total_crit = total_criteria_fr if lang_key == "fr" else total_criteria_nl
 
     # Valeurs extraites pour cet arrêt
     covered = sum(
@@ -153,7 +154,7 @@ for arret_id, info in sorted(arrets.items(), key=lambda x: x[1]["numero"]):
         print(f"  Critères clés :")
         for cid_prefix, label in keys.items():
             # Trouver le critère correspondant
-            matching = [c for c in crit_res.data if c["id"].startswith(cid_prefix) and c["langue"] == lang]
+            matching = [c for c in crit_res.data if c["id"].startswith(cid_prefix) and c["language"] == lang]
             if not matching:
                 print(f"    {label:25s}: [critère introuvable]")
                 continue
