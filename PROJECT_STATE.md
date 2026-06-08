@@ -4,9 +4,10 @@ Dernière mise à jour : 2026-06-08 (R-Phase 10 terminée — 108 arrêts analys
 
 ## Objectifs en cours
 
-1. **Score courant : 211/384 = 54%** (légère régression -3 LLM non-déterministe vs R-Phase 8). Dernier commit pushé : `41f59a4` (R-Phase 8) — UI non commitée.
+1. **Score courant : 211/384 = 54%** (légère régression -3 LLM non-déterministe vs R-Phase 8). Dernier commit pushé : `4bc2463` (UI Validation).
 2. **108 arrêts analysés** en base (85 FR + 23 NL), tous avec prompts R-Phase 8. Instance Vast.ai **détruite** ✅.
 3. **Validation avocate** — L'avocate (`test@dimagin.studio`, rôle `avocat`) peut se connecter et valider sur `/validation`. Cible ≥ 65% DPI avant traitement massif.
+4. **Vast.ai autonome** : CLI dans `worker/.venv`, clé API configurée. Règle : max **2,50 $/h**, viser le moins cher. Balance ~15 $.
 4. ~~R-Phase 10~~ — **Terminée** (2026-06-08) : 50 nouveaux FR scrapés + extraits + analysés (48 valeurs/arrêt). Score 211/384 = 54%.
 5. ~~R-Phase 9~~ — **Terminée** (2026-06-08) : 42 non-référence re-analysés + 8 nouveaux (5 FR + 3 NL). Score stable 214/384 = 55%.
 5. ~~R-Phase 8~~ — **Terminée** (2026-06-08) : group_note evidence_documents non-DPI + Geboorteplaats regex NL. +3 pts → 214/384. Push `41f59a4`.
@@ -1342,30 +1343,51 @@ L'avocate (`test@dimagin.studio`, rôle `avocat`) peut se connecter sur l'app et
 ### Prompt de reprise (autosuffisant — à coller après /clear)
 
 ```
-R-Phase 10 terminée (2026-06-08). Score référence : 211/384 = 54%. Commit `41f59a4` pushé (main). Instance Vast.ai détruite.
+R-Phase 10 terminée (2026-06-08). Score référence : 211/384 = 54%. Dernier commit : `4bc2463` (main). Instance Vast.ai détruite.
 
-État base : 108 arrêts analysés (85 FR + 23 NL), tous avec prompts R-Phase 8. 15 arrêts fictifs seed (CCE 260.001–015) ignorés.
+État base : 108 arrêts analysés (85 FR + 23 NL), tous avec prompts R-Phase 8.
+15 arrêts fictifs seed (CCE 260.001–015) ignorés. UI Validation commitée.
+Rôles : kdoucenet@gmail.com = admin, test@dimagin.studio = avocat.
 
-UI : onglet "Validation" ajouté dans la sidebar + BottomNav mobile (admin/avocat uniquement). Changements NON commités.
-Rôles : kdoucenet@gmail.com = admin, test@dimagin.studio = avocat (accès /validation depuis la sidebar).
+VASTAI : CLI installée dans worker/.venv, clé configurée (~/.config/vastai/vast_api_key + .env.local).
+RÈGLE PRIX : max 2,50 $/h, viser toujours le moins cher. Balance compte : ~15 $ (après R-Phase 10 ~0,50 $).
 
-ÉTAT : en attente de validation avocate sur /validation (filtrer "Asile / protection").
-Seuil batch massif : ≥ 5 arrêts DPI validés + taux incorrects ≤ 20%.
-Score actuel trop bas (54%) pour batch — attendre retour avocate avant toute décision.
+OBJECTIF R-Phase 11 : scraper 50 nouveaux arrêts FR + s'assurer qu'il y a au moins 50 arrêts avec valeurs LLM à analyser.
 
-PROCHAINE SESSION possible :
-A) Retour avocate avec taux incorrects → si > 20% : R-Phase 11 (corrections prompts ciblées)
-B) Commit + push des changements UI non commités (icons.tsx, Sidebar.tsx, BottomNav.tsx, layout.tsx)
-C) Si besoin d'analyser plus d'arrêts : louer instance Vast.ai (2× A100 SXM4, --tensor-parallel-size 2)
+SÉQUENCE AUTONOME (Claude fait tout) :
+1. Scraper 50 nouveaux FR localement :
+   cd C:\Projects\saas-juridique-cce-rvv\worker
+   $env:PYTHONIOENCODING="utf-8"; .\.venv\Scripts\python.exe scraper.py --lang fr --limit 50
+2. Extraire les PDF localement :
+   .\.venv\Scripts\python.exe main.py --limit 50
+3. Vérifier combien d'arrêts sont sans valeurs LLM (pending) → si < 50, scraper à nouveau
+4. Louer instance Vast.ai via CLI (max 2,50 $/h, chercher le moins cher) :
+   .venv\Scripts\vastai search offers "gpu_name=A100_SXM4 num_gpus=2 gpu_ram>=79 dph_total<=2.5 cuda_vers>=12.6 disk_space>=80" --order dph_total
+   .venv\Scripts\vastai create instance <ID> --image pytorch/pytorch --disk 80
+5. Attendre que l'instance soit Running → récupérer SSH
+6. Git clone + pip install + .env.local + vLLM + analyze.py --limit 50 --concurrency 4
+7. score_reference.py (ne pas régresser 211/384)
+8. Détruire l'instance : .venv\Scripts\vastai destroy instance <ID>
 
-COMMANDE vLLM validée (2× A100 SXM4 80 Go, CUDA 13.2) :
+COMMANDE vLLM validée (2× A100 SXM4, CUDA ≥ 12.6) :
 nohup .venv/bin/python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-72B-Instruct-AWQ --port 8000 --dtype auto --max-model-len 16384 --gpu-memory-utilization 0.92 --trust-remote-code --enforce-eager --tensor-parallel-size 2 > /workspace/saas-juridique/logs/vllm.log 2>&1 &
+
+.env.local à créer sur l'instance :
+NEXT_PUBLIC_SUPABASE_URL=https://kuwhvnyvughydcqzjrby.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1d2h2bnl2dWdoeWRjcXpqcmJ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDMwNjAyNywiZXhwIjoyMDk1ODgyMDI3fQ.c8pnDRQTBTAGEzgELoqwU8v8RSIkXcC8k4Sj9aj-Qlo
+LLM_PROVIDER=vllm
+VLLM_BASE_URL=http://localhost:8000/v1
+VLLM_MODEL=Qwen/Qwen2.5-72B-Instruct-AWQ
+LLM_MAX_OUTPUT_TOKENS=4096
+LLM_TIMEOUT_SECONDS=240
+LLM_MAX_INPUT_CHARS=32000
 
 RÈGLES ABSOLUES :
 - Ne PAS modifier worker/prompts.py ni worker/analyze.py sans validation du score référence
 - Ne PAS lancer analyze_reference.py (régression non-déterministe)
-- Ne PAS purger les 8 UUIDs de référence
-- Ne PAS dépasser 110 arrêts analysés avant retour avocate
+- Ne PAS purger les 8 UUIDs de référence (voir PROJECT_STATE.md)
+- Ne PAS dépasser 160 arrêts analysés au total avant retour avocate
+- Vast.ai : max 2,50 $/h, toujours chercher le moins cher, détruire dès que l'analyse est terminée
 ```
 
 ---
