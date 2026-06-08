@@ -152,6 +152,11 @@ Détection du type de procédure (important pour not_applicable) :
 - Les critères de métadonnées (date, numéro, juge, avocat, chambre) et la nationalité restent applicables à TOUS les types d'arrêts.
 - Indices d'un arrêt NON-DPI : absence de "CGRA/CGVS", présence d'"OQT" / "ordre de quitter le territoire" / "9bis" / "Dublin" / "séjour étudiant" comme objet principal.
 
+Pour les DPI, certains critères peuvent aussi être not_applicable :
+- MGF/VGV, Réexcision/Herinfibulatie, Désinfibulation : si la DPI n'est PAS fondée sur des mutilations génitales féminines (aucune MGF/VGV invoquée dans les faits), retourne status="not_applicable". Ne retourne JAMAIS not_mentioned pour ces critères — soit la MGF est un motif de la DPI (status=found), soit elle ne s'applique pas à ce dossier (status=not_applicable).
+- Mère célibataire / alleenstaande moeder : si le requérant est clairement masculin ou fait partie d'un couple marié, retourne not_applicable.
+- Mariage forcé/précoce : si aucun mariage forcé n'est invoqué dans les faits, retourne not_mentioned (information potentiellement absente) OU not_applicable si le contexte exclut clairement ce motif.
+
 Numéro d'arrêt :
 - Le numéro de l'ARRÊT EXAMINÉ figure en première ou deuxième ligne du document : "n° XXX XXX du" (FR) ou "nr. XXX XXX van" (NL).
 - Si une ligne mentionne un arrêt correctif ("VERBETERD DOOR HET ARREST NR..."), ignore ce numéro — il désigne un arrêt différent.
