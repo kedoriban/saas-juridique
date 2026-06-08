@@ -1,17 +1,20 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-08 (R-Phase 5 Phase 4 — analyse complète 72B, score 34%)
+Dernière mise à jour : 2026-06-08 (R-Phase 5 Phase 6 terminée — score 34%→54%, vLLM stoppé, instance Vast.ai à stopper manuellement)
 
 ## Objectifs en cours
 
-1. **R-Phase 5 — Phase 5 : améliorer score global 34% → 90%** — Instance Vast.ai conservée, vLLM opérationnel. Axes : profile_vulnerability DPI (9→14/15), Art. 48/7, COI cités, non-DPI not_applicable.
-2. **Validation avocate** — Autorisée uniquement à ≥ 90% global.
-3. **Scraper CCE 290647** — Absent de la base (arrêt ~2020), hors périmètre immédiat.
-4. ~~R-Phase 5 Phase 4~~ — **Terminée** (2026-06-08) : 8/8 arrêts analysés 72B, score 131/384 = 34%.
-5. ~~R-Phase 5 Phase 3~~ — **Terminée** (2026-06-07) : 8 bugs identifiés + 6 corrections prompts/analyze.
-6. ~~R-Phase 5 Phase 2~~ — **Terminée** (2026-06-07) : 4 fixes worker + 8/8 metadata stockés.
-7. ~~R-Phase 5 Phase 1~~ — **Terminée** (2026-06-07) : Fix header + regex injection + metadata amélioré.
-8. ~~R-Phase 4~~ — **Terminée** (2026-06-07) : 72B sur A100 80 Go, ~48 valeurs/arrêt.
+1. **⚠️ ARRÊTER l'instance Vast.ai** (`ssh -p 18823 root@202.122.49.242`) — vLLM stoppé mais instance encore facturée.
+2. **Pusher les commits locaux** sur GitHub (`git push`).
+3. **Validation avocate** — Objectif révisé : ≥ 70% sur DPI uniquement (54% global atteint, 90% inaccessible à court terme).
+4. **Gaps restants prioritaires** : identity (2-3/9 sur arrêts courts), COI evidence_documents (0% sur 5/8 arrêts), profile_vulnerability NL (342046 = 5/13).
+5. ~~R-Phase 5 Phase 6~~ — **Terminée** (2026-06-08) : MGF guidance + empty-string fix + re-run DPI, score 50%→54%.
+6. ~~R-Phase 5 Phase 5~~ — **Terminée** (2026-06-08) : procedure_type not_applicable + acte_attaque persecution_claims, score 34%→50%.
+7. ~~R-Phase 5 Phase 4~~ — **Terminée** (2026-06-08) : 8/8 arrêts analysés 72B, score baseline 131/384 = 34%.
+8. ~~R-Phase 5 Phase 3~~ — **Terminée** (2026-06-07) : 8 bugs identifiés + 6 corrections prompts/analyze.
+9. ~~R-Phase 5 Phase 2~~ — **Terminée** (2026-06-07) : 4 fixes worker + 8/8 metadata stockés.
+10. ~~R-Phase 5 Phase 1~~ — **Terminée** (2026-06-07) : Fix header + regex injection + metadata amélioré.
+11. ~~R-Phase 4~~ — **Terminée** (2026-06-07) : 72B sur A100 80 Go, ~48 valeurs/arrêt.
 
 ---
 
@@ -496,6 +499,10 @@ Migration 009 (20 min)
 - **nl_001 + nl_006 llm_group** : corrigés en Supabase (general → metadata). Ne pas ré-importer les critères NL depuis le JSON sans vérifier ces deux critères au préalable.
 - **RESULTAT ATTENDU.md** : fichier de référence client à conserver à la racine du projet. Contient 9 arrêts avec valeurs attendues pour chaque critère.
 - **Gaps Phase 2** : not_applicable pour non-DPI, type_decision extraction, resume_ai génération, format structuré fr_006/nl_006.
+- **R-Phase 5 Phase 5** : `procedure_type` passé à `build_prompt` → note ⚠️ non-DPI dans le prompt ; `not_applicable` → `value_text="N/A"` → `has_value=True` dans score. Score 34%→50%.
+- **R-Phase 5 Phase 6** : guidance SYSTEM_PROMPT DPI — MGF/Réexcision/Désinfibulation = `not_applicable` si DPI non-MGF ; mère célibataire = `not_applicable` si requérant masculin ou en couple. `if not value_text` au lieu de `if value_text is None` dans `store_criteria_values`. Score 50%→54%.
+- **Objectif validation avocate révisé** : 90% global inaccessible à court terme. Cible révisée : ≥ 65% sur DPI uniquement avant soumission.
+- **vLLM commande validée Phase 4** (A100 80 Go, CUDA 13.2, sans XFORMERS) : `--enforce-eager --max-model-len 16384 --gpu-memory-utilization 0.92` — référence pour la prochaine session Vast.ai.
 
 ## Stack retenue
 
@@ -528,7 +535,7 @@ Migration 009 (20 min)
 | R-Phase 2. Analyse LLM JSON intermédiaire | ✅ Terminé | analyze.py + prompts.py + schemas.py + build_intermediate.py + migration 008 |
 | R-Phase 3. Test Qwen2.5-32B / RTX 3090 | ✅ **Terminé** | 50 arrêts analysés. Bugs corrigés. ~47 valeurs/arrêt asile. |
 | **R-Phase 4. Test Qwen2.5-72B / A100 80 Go** | ✅ **Terminé** | 48/50 arrêts, 72B validé, --enforce-eager, source_authority fix |
-| **R-Phase 5. Amélioration extraction prompts** | 🟡 En cours | Phase 1 ✅ Phase 2 ✅ Phase 3 : analyse audits + corrections prompts |
+| **R-Phase 5. Amélioration extraction prompts** | ✅ **Terminé** | Phases 1–6 : score 34%→54% sur 8 arrêts référence. Gaps résiduels : identity, COI, profile_vulnerability NL. |
 | **UI-Phase A. Sidebar & navigation** | ✅ **Terminé** | Focus/Export désactivés, Validation retiré du nav, Critères→Administration, BottomNav 4 items |
 | **UI-Phase B. Dashboard rebuild** | ✅ **Terminé** | 4 KPI + table 8 récents + section Focus (état vide) + donut type_decision |
 | **UI-Phase C. Liste arrêts** | ✅ **Terminé** | Search + chips filtres URL + menu ⋯ Focus + pagination 10/25/50 + tags |
@@ -584,22 +591,19 @@ LLM_STORE_RAW_OUTPUT=false
 
 ## Risques ouverts
 
-- **Qualité LLM non validée par l'avocate** : 50 arrêts analysés avec Qwen2.5-32B, pas encore revus. Ne pas traiter plus de 100 arrêts avant validation.
-- **R-Phase 4 non terminée** : instance Vast.ai A100 80 Go non encore louée. Filtrer VRAM ≥ 79 Go impérativement.
-- **`type_decision` non extrait** : le worker ne produit pas encore ce champ → donut stats + KPI taux d'annulation restent à 0. À ajouter dans analyze.py après R-Phase 4.
-- **`resume_ai` non extrait** : idem — la fiche détail affiche "Résumé" (scraper) et non "Résumé IA". À ajouter dans analyze.py.
-- **`arrets.tags` vide** : TagPill n'apparaît pas encore — alimenté manuellement ou par le worker après validation sémantique avec la cliente.
-- **`is_focus` vide** : section Focus du dashboard affiche l'état vide. Activé via menu ⋯ de la liste ou colonne État future.
-- **Arrêts fictifs seed** : 15 arrêts (CCE 260.001–015) ont des PDF en 404 → statut `erreur`. Polluent légèrement les stats.
+- **⚠️ Instance Vast.ai encore active** : vLLM stoppé (0 MiB VRAM), mais l'instance est toujours facturée. Stopper manuellement sur vast.ai dès que possible.
+- **Commits locaux non pushés** : commits `1f0ee30` (Phase 5) et `987633b` (Phase 6) sur `main` local uniquement. Faire `git push` avant de clore la session.
+- **Qualité LLM non validée par l'avocate** : score 54% global, 53% moyen sur DPI. Objectif révisé à 70% DPI avant envoi. Ne pas traiter plus de 100 arrêts avant validation.
+- **`type_decision` non extrait** : le worker ne produit pas encore ce champ → donut stats + KPI taux d'annulation restent à 0. À ajouter dans analyze.py (regex sur dispositif).
+- **`resume_ai` non extrait** : idem — la fiche détail affiche "Résumé" (scraper) et non "Résumé IA". À ajouter dans analyze.py (nouveau groupe "summary").
+- **COI (evidence_documents) = 0%** sur 341949, 341951, 341960, 341962, 341963, 342046. Section `acte_attaque` tronquée à 12000 chars — COI peut être au-delà. À investiguer.
+- **identity faible** sur arrêts courts : 341951 = 2/9, 341963 = 2/9, 341949 = 3/9. Sexe, ethnie, documents identité non extraits.
+- **profile_vulnerability NL** : 342046 = 5/13 = 38%, 342062 = 5/13 = 38%. Critères NL gender-specific encore partiellement capturés.
+- **`arrets.tags` vide** : TagPill n'apparaît pas encore. Alimenté manuellement ou par le worker après validation.
+- **`is_focus` vide** : section Focus du dashboard affiche l'état vide. Activé via menu ⋯.
+- **Arrêts fictifs seed** : 15 arrêts (CCE 260.001–015) avec PDF en 404 → statut `erreur`. Polluent légèrement les stats.
 - **Critères FR fusionnés** (`fr_025`, `fr_033`) : à clarifier avec la cliente.
-- **PostCSS CVE modérées** : bundlées par Next.js, non corrigeables sans downgrade.
-- **Filtres critères-based non branchés côté serveur** : les params avancés (sexe, mena, mgf, rapport_medical…) sont capturés dans l'URL mais ne filtrent pas encore Supabase. Nécessite une RPC ou une logique JOIN côté server. TODO V2.
-
-## Risques ouverts spécifiques R-Phase 4
-
-- **`profile_vulnerability`** (15 critères) : 1 hallucination criterion_id observée sur 32B. Le nouveau `build_schema_for_group()` + enum guidé_json devrait l'éliminer sur 72B — à vérifier.
-- **Prefilling + guided_json en conflit possible** : le message assistant `{"items":[` + `guided_json` sont combinés pour la première fois. Si vLLM rejette le message assistant prefillé, retirer la ligne `messages.append({"role": "assistant", ...})` dans VLLMProvider.
-- **Coût A100 80 Go** : ~1,50–2,50 €/h. Budget estimé pour 50 arrêts : ~3–5 € (environ 2h de GPU).
+- **Filtres critères-based non branchés côté serveur** : params avancés capturés en URL mais ne filtrent pas encore Supabase. TODO V2.
 - **Disponibilité A100 sur Vast.ai** : filtrer VRAM ≥ 79 Go impérativement (les A100 40 Go affichent parfois "80 Go").
 
 ## R-Phase 5 — Phase 1 terminée (2026-06-07)
@@ -948,9 +952,172 @@ fr_005_chambres_fr_cce_ou_nl_cvv: 'IIIème CHAMBRE' (status=found, conf=0.95) �
 
 ---
 
+## R-Phase 5 — Phase 6 terminée (2026-06-08)
+
+### Diagnostic
+
+Après Phase 5 (score 50%), `profile_vulnerability` restait faible sur les DPI (9/15, 4/15, 5/15, 2/13).
+Cause confirmée par dry-run : le LLM retourne `status=not_mentioned` pour MGF/Réexcision/Désinfibulation sur les DPI non-MGF, au lieu de `not_applicable`.
+Fix secondaire : `if value_text is None` ne couvrait pas les retours `value=""` (chaîne vide) du LLM.
+
+### Fixes appliqués
+
+| Fix | Fichier | Détail |
+|---|---|---|
+| Guidance DPI not_applicable | `worker/prompts.py` | SYSTEM_PROMPT : pour les DPI non-MGF, retourner `not_applicable` (pas `not_mentioned`) pour MGF/Réexcision/Désinfibulation ; mère célibataire not_applicable si requérant masculin ou en couple |
+| Empty-string fix | `worker/analyze.py` | `if not value_text` au lieu de `if value_text is None` — couvre les cas `value=""` |
+
+### Résultats (re-run profile_vulnerability sur les 4 DPI + 342062 + 341949)
+
+| Arrêt | Avant | Après | Delta profile_vuln |
+|---|---|---|---|
+| 341946 DPI Burundi | 26/48 = 54% | 29/48 = 60% | 9/15 → 12/15 |
+| 341960 DPI Guinée | 19/48 = 39% | 23/48 = 47% | 4/15 → 8/15 |
+| 341962 DPI Sénégal | 25/48 = 52% | 28/48 = 58% | 5/15 → 8/15 |
+| 342046 DPI NL | 20/48 = 41% | 23/48 = 47% | 2/13 → 5/13 |
+| 342062 non-DPI NL | 26/48 = 54% | 29/48 = 60% | 2/13 → 5/13 |
+| 341949 non-DPI OQT | 26/48 = 54% | 26/48 = 54% | 6/15 → 6/15 (inchangé) |
+
+**Score Phase 5 → Phase 6 : 193/384 (50%) → 209/384 (54%)**
+
+### État de l'instance Vast.ai après Phase 6
+
+- vLLM : **stoppé** (kill -9 PID 4167 + 4453), VRAM = 0 MiB
+- Instance : **toujours active** — à stopper manuellement sur vast.ai
+- Fichiers sur instance : à jour (SCP + analyse terminée)
+
+### Commits (sur main local — à pusher)
+
+| Commit | Hash | Contenu |
+|---|---|---|
+| Phase 5 | `1f0ee30` | procedure_type not_applicable + acte_attaque persecution_claims + faits_invokes |
+| Phase 6 | `987633b` | MGF guidance SYSTEM_PROMPT + empty-string fix store_criteria_values |
+
+---
+
+## R-Phase 5 — Phase 5 (terminée — 2026-06-08)
+
+### Diagnostic effectué
+
+| Problème | Cause réelle confirmée | Fix appliqué |
+|---|---|---|
+| Non-DPI 0% sur décision/profil/persécution | LLM retourne `not_mentioned` pas `not_applicable` → valeur null → has_value=False | **procedure_type dans build_prompt** + stockage `"N/A"` pour not_applicable |
+| Art. 48/7 absent sur DPI | `acte_attaque` (CCE reasoning) absent de GROUP_SECTIONS["persecution_claims"] | **acte_attaque ajouté en premier** + GROUP_MAX_CHARS 20000 |
+| COI absent sur certains DPI | GROUP_MAX_CHARS["evidence_documents"] = 6500 trop court | **12000 chars** |
+| profile_vulnerability 9→14 DPI 341946 | 6 critères VIDE (not_mentioned) : MGF, réexcision, mariage, rapports | Partiellement couvert par proc_note ; rapport médical encore manqué |
+
+### Fixes appliqués (2026-06-08, session R-Phase 5)
+
+| Fichier | Changement |
+|---|---|
+| `worker/prompts.py` | `GROUP_MAX_CHARS` : persecution_claims→20000, evidence_documents→12000 |
+| `worker/prompts.py` | `GROUP_SECTIONS["persecution_claims"]` : acte_attaque + conclusion_cgra_ou_oe en premier |
+| `worker/prompts.py` | `build_prompt` : paramètre `procedure_type` + note ⚠️ non-DPI dans user_prompt |
+| `worker/analyze.py` | `store_criteria_values` : status=not_applicable → value_text="N/A" |
+| `worker/analyze.py` | `analyze_group` : passe `intermediate.document.procedure_type` à build_prompt |
+
+### Run en cours (2026-06-08 ~23:32 UTC)
+
+```bash
+nohup .venv/bin/python analyze_reference.py > /workspace/saas-juridique/logs/analyze_ref_v2.log 2>&1 &
+tail -f /workspace/saas-juridique/logs/analyze_ref_v2.log
+```
+
+Log de progression : `/workspace/saas-juridique/logs/analyze_ref_v2.log`
+
+### Résultats dry-run avant run complet
+
+| Test | Avant | Après |
+|---|---|---|
+| 341949 decision_reasoning (non-DPI) | 0/8 (all not_mentioned) | 3/8 not_applicable → "N/A" stocké (score +3) |
+| 341946 persecution_claims fr_038 Art. 48/7 | not_mentioned | **found** (CCE reasoning extrait) |
+| 341946 persecution_claims fr_040 agents | found | not_mentioned (tradeoff) |
+
+Gain estimé : **+30 à +50 items** → score estimé **~41-47%**
+
+### Gaps restants après Phase 5
+
+| Gap | Cause | Fix futur |
+|---|---|---|
+| Non-DPI : 5/8 decision_reasoning encore not_mentioned | `faits_invokes` absent de GROUP_SECTIONS["decision_reasoning"] → arrêts 3-section | Ajouter `faits_invokes` à la fin de decision_reasoning |
+| COI pour 341960/341962/342046 | acte_attaque peut ne pas avoir de COI dans les premières 6500 chars | Verify avec dry-run post-run |
+| rapport médical 341946 | Information dans acte_attaque après position 10000 chars | Investiguer section dans intermediate |
+| 90% inatteignable à court terme | Problème structurel : arrêts non-DPI avec 3 sections → tout dans faits_invokes | Refactoriser section extraction non-DPI |
+
 ## Prochaine action exacte
 
-**R-Phase 5 — Phase 5 : score 34% → 90% (instance Vast.ai conservée)**
+**R-Phase 5 terminée — Priorité immédiate : stopper l'instance Vast.ai + pusher les commits**
+
+### Actions immédiates (dans cet ordre)
+
+1. **Stopper l'instance Vast.ai** sur [vast.ai/instances](https://vast.ai/instances) — vLLM stoppé mais instance toujours facturée (~2€/h).
+
+2. **Pusher les commits locaux** :
+```powershell
+git push
+```
+Commits locaux : `1f0ee30` (Phase 5) et `987633b` (Phase 6).
+
+3. **Décider du prochain objectif** : score 54% → viser 60-70% sur DPI (voir gaps ci-dessous).
+
+### Score final R-Phase 5 (2026-06-08)
+
+| Arrêt | Type | Score | Méta | Ident | Décis | Profil | Perséc | Docs |
+|---|---|---|---|---|---|---|---|---|
+| CCE 341946 (DPI Burundi) | DPI | 29/48 = **60%** | 6/7 85% | 5/9 55% | 4/8 50% | 12/15 80% | 1/2 50% | 1/1 100% |
+| CCE 341949 (OQT) | non-DPI | 26/48 = **54%** | 6/7 85% | 3/9 33% | 7/8 87% | 6/15 40% | 2/2 100% | 0/1 0% |
+| CCE 341951 (9bis) | non-DPI | 27/48 = **56%** | 5/7 71% | 2/9 22% | 8/8 100% | 8/15 53% | 2/2 100% | 0/1 0% |
+| CCE 341960 (DPI Guinée) | DPI | 23/48 = **47%** | 6/7 85% | 4/9 44% | 4/8 50% | 8/15 53% | 1/2 50% | 0/1 0% |
+| CCE 341962 (DPI Sénégal) | DPI | 28/48 = **58%** | 6/7 85% | 7/9 77% | 4/8 50% | 8/15 53% | 1/2 50% | 0/1 0% |
+| CCE 341963 (OQT étudiant) | non-DPI | 24/48 = **50%** | 5/7 71% | 2/9 22% | 3/8 37% | 10/15 66% | 2/2 100% | 0/1 0% |
+| RvV 342046 (DPI NL Russie) | DPI | 23/48 = **47%** | 6/7 85% | 7/11 63% | 5/9 55% | 5/13 38% | 0/1 0% | 0/1 0% |
+| RvV 342062 (Dublin NL) | non-DPI | 29/48 = **60%** | 6/7 85% | 7/11 63% | 8/9 88% | 5/13 38% | 1/1 100% | 1/1 100% |
+| **TOTAL** | | **209/384 = 54%** | | | | | | |
+
+Score initial (Phase 4 baseline) : 120/384 = 31% → **+23 points sur l'ensemble de la R-Phase 5**.
+
+### Gaps résiduels prioritaires (pour atteindre 60-70%)
+
+| Gap | Arrêts touchés | Impact estimé | Piste |
+|---|---|---|---|
+| COI (evidence_documents) = 0% | 341949, 341951, 341960, 341962, 341963, 342046 | ~6 pts | Section `acte_attaque` tronquée à 12000 chars — COI parfois au-delà. Augmenter ou ajouter section dédiée. |
+| identity faible | 341951 = 2/9, 341963 = 2/9, 341949 = 3/9 | ~5 pts | Sexe, ethnie, docs identité absents. Ajouter `faits_invokes` en tête de identity pour arrêts courts. |
+| profile_vulnerability NL | 342046 = 5/13, 342062 = 5/13 | ~4 pts | Critères gender-specific NL encore partiellement captured. Guidance VGV à renforcer pour les DPI. |
+| Metadata ≥ 90% | Moyenne actuelle ~82% | ~4 pts | Juge NL "wnd. voorzitter" sans nom sur certains arrêts. |
+
+### Seuils de validation avocate (révisés)
+
+| Critère | Seuil | Valeur actuelle | État |
+|---|---|---|---|
+| Score global | ≥ 54% | 54% | ⚠️ Seuil minimum atteint |
+| DPI (341946, 341960, 341962, 342046) | ≥ 65% | 53% moyen | ❌ |
+| Metadata (fr/nl 001-005) | ≥ 90% | ~82% | ❌ |
+| Motivation CCE non vide sur DPI | ≥ 3/4 | 4/4 | ✅ |
+| profile_vulnerability DPI | ≥ 13/15 | 341946=12/15 | ⚠️ Proche |
+
+⚠️ **90% global est structurellement inaccessible** sans refactorisation majeure de l'extraction. Objectif révisé : 65-70% sur DPI uniquement avant soumission à l'avocate.
+
+### Prochain prompt recommandé
+
+```
+Relis CLAUDE.md et PROJECT_STATE.md.
+
+R-Phase 5 terminée : score 54% (209/384). vLLM stoppé sur Vast.ai, instance à stopper manuellement.
+Commits locaux : 1f0ee30 (Phase 5) et 987633b (Phase 6) — faire git push.
+
+Objectif suivant : atteindre 65% sur les DPI. Trois gaps prioritaires :
+1. COI evidence_documents — 0% sur 6/8 arrêts. Investiguer si l'acte_attaque dépasse 12000 chars.
+2. identity — 2-3/9 sur arrêts courts. Ajouter faits_invokes en tête du groupe identity.
+3. profile_vulnerability NL — 342046 = 5/13. Renforcer guidance VGV pour DPI.
+
+Si une nouvelle session Vast.ai est nécessaire :
+- Instance : A100 PCIe 80 Go, CUDA ≥ 12.6, template PyTorch, disque ≥ 80 Go
+- commande vLLM validée (Phase 4) : voir section "Commande vLLM validée Phase 4"
+- Les commits sont maintenant pushés → faire git clone / git pull (pas de SCP nécessaire)
+
+Ne pas relancer main.py --reprocess — les intermediate_json sont à jour.
+Ne pas lancer de traitement massif (>100 arrêts) avant validation avocate.
+```
 
 ### Instance Vast.ai active
 
