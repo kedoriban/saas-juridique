@@ -1142,6 +1142,32 @@ Gain attendu après fix : +3 pts → 215/384 = 56%.
 
 ---
 
+## R-Phase 7 — Phase 3 : bilan (2026-06-08)
+
+### Score final : 211/384 = 54% (-1 pt vs Phase 2)
+
+| Cause | Constat | Enseignement |
+|---|---|---|
+| `has_value("N/A")` | bool("N/A")=True → déjà True avant le fix. La vraie valeur en DB est `None`, pas "N/A" | Le LLM retourne `not_mentioned` pour fr_047 COI — fix requis dans prompts.py |
+| Re-run identity (8 arrêts) | 341949/341951/341963 inchangés (Sexe/Ethnie absents du texte) | Ne jamais relancer sur tous les arrêts — cibler par `--arret-id` |
+| 342046 identity NL | 7→6/11 (Geboorteplaats "Jerevan" perdu), LLM déterministe, non récupérable par re-run | Regex injection NL ou prompt amélioré nécessaire |
+
+### Fichiers modifiés (session 2026-06-08 R-Phase 7 Phase 3)
+
+| Fichier | Changement |
+|---|---|
+| `worker/score_reference.py` | Fix `has_value()` : check explicite `vt == "N/A"` avant `bool(vt)` (robustesse) |
+| `PROJECT_STATE.md` | Mise à jour bilan Phase 3, gaps, prochaine action |
+
+### Commits pushés
+
+| Hash | Contenu |
+|---|---|
+| `7fbe07f` | fix(worker): R-Phase 7 Phase 3 — has_value() check explicite "N/A" |
+| `c9cbb66` | chore: PROJECT_STATE Phase 3 — score 211/384=54%, gaps docs+identity NL |
+
+---
+
 ## Prochaine action exacte
 
 **R-Phase 8 — Récupérer 342046 identity + fix docs non-DPI**
@@ -1645,41 +1671,42 @@ IMPORTANT :
 - Ne pas lancer de traitement massif (>100 arrêts) avant validation avocate.
 ```
 
-## Prompt de reprise R-Phase 7 Phase 3
+## Prompt de reprise R-Phase 8
 
 ```
 Relis CLAUDE.md et PROJECT_STATE.md.
 
-R-Phase 7 Phase 2 terminée (2026-06-08) : re-run evidence_documents sur les 8 arrêts de référence.
-Score actuel : 212/384 = 55% (+3 pts). Commits locaux non pushés.
+R-Phase 7 Phase 3 terminée (2026-06-08) : fix has_value() + re-run identity.
+Score actuel : 211/384 = 54% (régression -1 vs 212 suite re-run identity masse sur 342046).
+Tous les commits sont pushés (c9cbb66). Aucun fichier local non commité.
 Instance Vast.ai ACTIVE : ssh -p 18823 root@202.122.49.242 (vLLM PID 8709, A100-SXM4-80GB).
 
-Objectif Phase 3 — 3 tâches dans cet ordre :
+Objectif R-Phase 8 — 2 tâches prioritaires (dans cet ordre) :
 
-1. Corriger score_reference.py (local PC) :
-   - has_value() ne compte pas value_text="N/A" (not_applicable) comme valide
-   - Corriger dans worker/score_reference.py, SCP sur l'instance, re-scorer
-   - Gain attendu : +3 pts → 215/384 = 56%
+1. Fix docs non-DPI — gain attendu : +3 pts → 214/384 = 56%
+   Cause : LLM retourne `not_mentioned` (pas `not_applicable`) pour fr_047 COI sur OQT/9bis/341949/341951/341963.
+   Fix local dans worker/prompts.py : renforcer le group_note evidence_documents pour forcer
+   value="N/A" explicitement quand procedure_type = non-DPI.
+   Après fix → SCP prompts.py → re-run sur les 3 arrêts UNIQUEMENT (--arret-id, pas analyze_reference) :
+     ssh -p 18823 root@202.122.49.242
+     cd /workspace/saas-juridique/worker
+     .venv/bin/python analyze.py --arret-id e62bfb49-8e15-45f9-95d5-2c558c2571d4 --group evidence_documents
+     .venv/bin/python analyze.py --arret-id b3adae70-1776-4c6c-846f-0d0776ae742b --group evidence_documents
+     .venv/bin/python analyze.py --arret-id 6f490a37-224c-4b96-92e9-97b740ede7c4 --group evidence_documents
+     PYTHONIOENCODING=utf-8 .venv/bin/python score_reference.py --verbose
 
-2. Re-run identity sur arrêts faibles :
-   ssh -p 18823 root@202.122.49.242
-   cd /workspace/saas-juridique/worker
-   PYTHONIOENCODING=utf-8 .venv/bin/python analyze_reference.py --group identity 2>&1 | tee /workspace/saas-juridique/logs/analyze_identity_v1.log
-   PYTHONIOENCODING=utf-8 .venv/bin/python score_reference.py --verbose
-   - Gain estimé : +3 à +5 pts → ~59-61%
-
-3. Pusher les commits locaux :
-   cd C:\Projects\saas-juridique-cce-rvv
-   git add worker/prompts.py worker/analyze.py PROJECT_STATE.md
-   git commit -m "fix(worker): R-Phase 7 Phase 2 — evidence_documents section order + cap + dédup + COI non-DPI"
-   git push
+2. Fix 342046 identity NL — gain attendu : +1 pt → 55%
+   Régression : Geboorteplaats "Jerevan" perdu (LLM déterministe sur ce cas).
+   Fix : ajouter regex injection Geboorteplaats dans extract_metadata.py ou _inject_regex_metadata.
+   UUIDs : 342046 → 08e588e6-62dc-4c41-adc8-d0fd5dd965e6
 
 IMPORTANT :
-- Instance Vast.ai toujours facturée (~2€/h) — stopper après la session si plus nécessaire.
+- Instance Vast.ai facturée (~2€/h) — stopper sur vast.ai après la session si plus utilisée.
 - Ne pas relancer main.py --reprocess.
-- vLLM toujours actif sur l'instance — vérifier avec : ssh -p 18823 root@202.122.49.242 "ps aux | grep vllm | grep -v grep"
-- Fichiers worker à jour sur instance (via SCP) : prompts.py, analyze.py, analyze_reference.py, score_reference.py.
+- Ne JAMAIS relancer analyze_reference.py sans --group ET sans cibler les arrêts concernés.
+  Toujours utiliser analyze.py --arret-id <uuid> --group <group> pour éviter les régressions.
 - Git sur l'instance est à d880f77 (stale) — toujours utiliser SCP pour transférer les fixes.
+- score_reference.py est à jour sur l'instance (via SCP en Phase 3).
 ```
 
 ## Points de vigilance permanents
