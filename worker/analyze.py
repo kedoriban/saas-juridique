@@ -291,6 +291,10 @@ def store_criteria_values(
         if not item.get("criterion_id"):
             continue
         value_text = item.get("value")
+        # Quand le LLM détermine explicitement que le critère n'est pas applicable,
+        # stocker "N/A" pour que has_value() retourne True dans score_reference.py.
+        if value_text is None and item.get("status") == "not_applicable":
+            value_text = "N/A"
         value_boolean = None
         if item.get("expected_value_type") == "boolean" and isinstance(value_text, str):
             token = value_text.strip().lower()
@@ -480,6 +484,7 @@ def analyze_group(
         group=group,
         criteria=[{"id": c["id"], "label": c["label_original"], "type": c["expected_value_type"]} for c in criteria],
         sections=sections,
+        procedure_type=intermediate.document.procedure_type,
     )
     prompt = (system_prompt, user_prompt)
 

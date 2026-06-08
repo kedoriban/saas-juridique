@@ -25,6 +25,8 @@ MAX_PASSAGE_CHARS = 6500
 GROUP_MAX_CHARS: dict[str, int] = {
     "decision_reasoning": 16000,
     "profile_vulnerability": 10000,
+    "persecution_claims": 20000,   # acte_attaque + corpus_arret + conclusion_cgra_ou_oe
+    "evidence_documents": 12000,   # inventaire COI dans acte_attaque parfois > 6500 chars
 }
 
 # Mapping groupe → section_ids prioritaires (ordre de pertinence).
@@ -86,8 +88,14 @@ GROUP_SECTIONS: dict[str, list[str]] = {
         "motivation_cgra_ou_oe", "motivering_cgvs_of_dv",
         "dispositif", "dictum",
         "analyse", "cadre_juridique", "credibilite", "arguments",
+        # Fallback pour arrêts non-DPI (3 sections) : faits_invokes contient tout
+        "faits_invokes", "feitenrelaas",
+        "corps_arret", "corps_uitspraak",
     ],
     "persecution_claims": [
+        # acte_attaque contient le raisonnement CCE sur Art. 48/7 et les agents de persécution
+        "acte_attaque", "bestreden_beslissing",
+        "conclusion_cgra_ou_oe", "conclusie_cgvs_of_dv",
         "faits_invokes", "feitenrelaas",
         "corps_arret", "corps_uitspraak",
         "these_partie_requerante", "standpunt_verzoekende_partij",
@@ -199,12 +207,30 @@ def build_prompt(
     group: str,
     criteria: list[dict],    # [{id, label, type}, ...]
     sections: list[SectionEntry],
+    procedure_type: str = "unknown",
 ) -> tuple[str, str]:
     """
     Construit le prompt pour un groupe de critères à partir de sections ciblées.
     Retourne (system_prompt, user_prompt) pour l'API chat.
     """
     lang_label = "français" if language == "fr" else "néerlandais"
+
+    # Note procédurale : si non-DPI, tous les critères DPI sont not_applicable
+    if procedure_type == "protection_internationale_fond":
+        proc_note = ""
+    elif procedure_type == "unknown":
+        proc_note = ""
+    else:
+        proc_note = (
+            f"\n⚠️ PROCÉDURE NON-DPI ({procedure_type}) : "
+            "cet arrêt ne porte PAS sur une demande de protection internationale. "
+            "Retourner status=\"not_applicable\" pour TOUS les critères liés à l'asile "
+            "(crédibilité, Art. 48/7, agents de persécution/protection, protection subsidiaire, "
+            "statut réfugié, CGRA/CGVS, fuite interne, groupe social, persécutions de genre, "
+            "MGF/VGV, mariage forcé, motivation CGRA, motivation CCE sur le fond DPI, COI). "
+            "Seules les métadonnées (date, numéro, juge, chambre, avocat) et la nationalité "
+            "restent applicables à tous les types d'arrêts."
+        )
 
     # Formater les sections avec leur en-tête d'autorité
     formatted: list[str] = []
@@ -250,6 +276,7 @@ def build_prompt(
 
     user_prompt = f"""Langue du document : {lang_label} ({language})
 Groupe de critères : {group}
+Type de procédure : {procedure_type}{proc_note}
 
 ## SECTIONS DE L'ARRÊT ({len(sections)} section(s), {total_chars} caractères)
 {joined}
