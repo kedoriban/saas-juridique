@@ -1,14 +1,16 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-08 (R-Phase 7 Phase 2 terminée — score 212/384 = 55%, instance Vast.ai toujours active)
+Dernière mise à jour : 2026-06-08 (R-Phase 7 Phase 3 terminée — score 211/384 = 54%, instance Vast.ai TOUJOURS ACTIVE)
 
 ## Objectifs en cours
 
-1. **Bug score_reference.py** : `has_value()` ne compte pas `not_applicable` comme valide pour le groupe `docs` → 341949/341951/341963 affichent "VIDE" alors que "N/A" est stocké en base.
-2. **R-Phase 7 Phase 3** : corriger `score_reference.py` puis re-scorer. Gain attendu : +3 pts → ~58%.
-3. **Gaps suivants** : identity faible (341951=2/9, 341963=2/9, 341949=3/9) + profile_vulnerability NL (342046=5/13).
-4. **Validation avocate** — Objectif révisé : ≥ 65% sur DPI uniquement (actuel 55% global, ~54% moyen DPI).
-5. ~~R-Phase 7 Phase 2~~ — **Terminée** (2026-06-08) : re-run evidence_documents, score 209→212/384. COI trouvé sur 341946/341960/341962/342046. not_applicable stocké pour 341949/341951/341963 (non compté dans le score = bug). Fixes : GROUP_SECTION_MAX, section order, dédup criterion_id.
+1. **Score courant : 211/384 = 54%** — régression -1 pt suite au re-run identity (342046 7→6 identity NL). Commits pushés.
+2. **Gap docs non-DPI** : fr_047 COI cités = NULL en base pour 341949/341951/341963 (LLM retourne not_mentioned, non not_applicable). Fix requis : prompts.py evidence_documents + group_note plus directif, ou fallback dans analyze.py.
+3. **Gap identity arrêts 3-sections** : 341949=3/9, 341951=2/9, 341963=2/9 — Sexe/Ethnie absents des sections reçues par le groupe identity. Arrêts non-DPI courts → info absente du texte disponible.
+4. **Gap 342046 identity NL** : régression 7/11→6/11 suite re-run (LLM déterministe sur ce cas, Geboorteplaats/Jerevan perdu). Récupération possible seulement en changeant la stratégie de prompt NL.
+5. **Validation avocate** — Objectif révisé : ≥ 65% sur DPI uniquement (actuel 54% global, ~55% moyen DPI).
+5. ~~R-Phase 7 Phase 3~~ — **Terminée** (2026-06-08) : fix has_value() score_reference.py (check explicite "N/A"), re-run identity (8 arrêts), re-score. Score final 211/384 = 54%. Régression 342046 identity 7→6 due au re-run masse. Leçons : docs=0/1 = value_text=None (non "N/A") ; re-run all-arrêts = risqué (LLM non-déterministe NL). Push `7fbe07f`.
+6. ~~R-Phase 7 Phase 2~~ — **Terminée** (2026-06-08) : re-run evidence_documents, score 209→212/384. COI trouvé sur 341946/341960/341962/342046. not_applicable stocké pour 341949/341951/341963 (non compté dans le score = bug). Fixes : GROUP_SECTION_MAX, section order, dédup criterion_id.
 6. ~~R-Phase 7 Phase 1~~ — **Terminée** (2026-06-08) : fix prompts.py 25000 chars, commit `cb1c724`, pushé.
 7. ~~R-Phase 5 Phase 6~~ — **Terminée** (2026-06-08) : MGF guidance + empty-string fix + re-run DPI, score 50%→54%.
 8. ~~R-Phase 5 Phase 5~~ — **Terminée** (2026-06-08) : procedure_type not_applicable + acte_attaque persecution_claims, score 34%→50%.
@@ -506,8 +508,11 @@ Migration 009 (20 min)
 - **Objectif validation avocate révisé** : 90% global inaccessible à court terme. Cible révisée : ≥ 65% sur DPI uniquement avant soumission.
 - **vLLM commande validée Phase 4** (A100 80 Go, CUDA 13.2, sans XFORMERS) : `--enforce-eager --max-model-len 16384 --gpu-memory-utilization 0.92` — référence pour la prochaine session Vast.ai.
 - **R-Phase 7 Phase 2 — fixes evidence_documents** : GROUP_SECTION_MAX (acte_attaque cap 10 000 chars), section order (acte_attaque → conclusion → motivation), dédup criterion_id dans store_criteria_values, group_note concision (max 200 chars/value), COI ajouté à not_applicable non-DPI dans SYSTEM_PROMPT. Score 209→212/384.
-- **Bug has_value() score_reference.py** : `value_text="N/A"` (not_applicable) non compté comme valide pour docs → 341949/341951/341963 affichent 0/1 alors que N/A est en base. À corriger avant prochain re-scoring.
-- **instance Vast.ai (2026-06-08)** : `ssh -p 18823 root@202.122.49.242`, A100-SXM4-80GB, vLLM PID 8709 actif, git à `d880f77` (fichiers worker à jour via SCP). **Toujours facturée.**
+- **R-Phase 7 Phase 3 — diagnostic has_value()** : La valeur en base pour fr_047 sur 341949/341951/341963 est `value_text=None` (NOT "N/A"). Le LLM retourne `not_mentioned` (pas `not_applicable`) pour le critère COI des arrêts non-DPI malgré la guidance SYSTEM_PROMPT. Fix has_value() ajouté (`if vt == "N/A": return True`) comme robustesse (commit `7fbe07f` pushé), mais sans gain de score.
+- **Re-run identity sur tous les arrêts = DANGEREUX** : la non-déterminisme du LLM peut faire régresser des arrêts qui étaient bien extraits. Toujours cibler des arrêts spécifiques via `analyze.py --arret-id <uuid> --group <group>`.
+- **Identity arrêts 3-sections** : 341949/341951/341963 ont identity faible (2-3/9) parce que Sexe/Ethnie sont absents des sections transmises au groupe identity (arrêts non-DPI courts). Gain impossible sans revoir les sections ou le prompt.
+- **342046 identity NL** : régression 7→6/11 après re-run. Geboorteplaats ("Jerevan") probablement perdu. LLM déterministe sur ce cas (même token count = même réponse). Récupérable seulement via changement de prompt.
+- **instance Vast.ai (2026-06-08)** : `ssh -p 18823 root@202.122.49.242`, A100-SXM4-80GB, vLLM PID 8709 actif, git à `d880f77` (score_reference.py à jour via SCP). **Toujours facturée.**
 
 ## Stack retenue
 
@@ -1139,60 +1144,81 @@ Gain attendu après fix : +3 pts → 215/384 = 56%.
 
 ## Prochaine action exacte
 
-**R-Phase 7 Phase 3 — Corriger `score_reference.py` puis re-run identity**
+**R-Phase 8 — Récupérer 342046 identity + fix docs non-DPI**
 
-### Actions immédiates (dans cet ordre)
+### Contexte (après Phase 7 Phase 3 — 2026-06-08)
 
-1. **Corriger `score_reference.py`** : `has_value()` doit compter `value_text="N/A"` (not_applicable) comme valide. Gain attendu : +3 pts → 215/384 = 56%.
+Score actuel : **211/384 = 54%**. Score avant Phase 3 : 212/384 = 55%. Régression due au re-run identity masse sur 342046.
 
-2. **Re-scorer** après correction :
+### Option A — Fix docs non-DPI (gain attendu : +3 pts → 214/384 = 56%)
+
+Cause : le LLM retourne `not_mentioned` (pas `not_applicable`) pour `fr_047` COI sur OQT/9bis malgré la guidance.
+Fix : dans `prompts.py`, renforcer la guidance `evidence_documents` pour forcer `not_applicable` + `value="N/A"` explicitement dans le group_note.
+
+```python
+# Dans prompts.py, group_note de evidence_documents (non-DPI) :
+# Ajouter : "Pour les arrêts non-DPI (OQT, 9bis, Dublin), retourner status=not_applicable
+# ET value='N/A' pour fr_047/nl_047. Ne jamais retourner not_mentioned."
+```
+
+Après fix → SCP prompts.py → re-run evidence_documents sur 341949/341951/341963 :
 ```bash
 ssh -p 18823 root@202.122.49.242
 cd /workspace/saas-juridique/worker
+PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --arret-id e62bfb49-8e15-45f9-95d5-2c558c2571d4 --group evidence_documents
+PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --arret-id b3adae70-1776-4c6c-846f-0d0776ae742b --group evidence_documents
+PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --arret-id 6f490a37-224c-4b96-92e9-97b740ede7c4 --group evidence_documents
 PYTHONIOENCODING=utf-8 .venv/bin/python score_reference.py --verbose
 ```
 
-3. **Re-run identity** sur les arrêts faibles (341951=2/9, 341963=2/9, 341949=3/9) : gain estimé ~5 pts.
-```bash
-PYTHONIOENCODING=utf-8 .venv/bin/python analyze_reference.py --group identity 2>&1 | tee /workspace/saas-juridique/logs/analyze_identity_v1.log
-```
+### Option B — Récupérer 342046 identity NL (gain attendu : +1 pt → 212/384 = 55%)
 
-4. **Pusher les commits locaux** après validation :
-```powershell
-git push
-```
+Cause : Geboorteplaats "Jerevan" (Armeense origine, geboren in Jerevan) perdu après re-run.
+Le LLM est déterministe sur ce cas → re-run seul ne suffit pas.
+Fix : ajouter `_inject_regex_metadata` ou améliorer prompt NL identity pour capturer la ville de naissance.
 
-### Score R-Phase 7 Phase 2 (2026-06-08) — affiché par score_reference.py
+Alternative rapide : dry-run identity sur 342046 avec température différente (si vLLM supporte) ou modifier légèrement le prompt.
+
+### Instance Vast.ai (TOUJOURS ACTIVE)
+
+- **SSH** : `ssh -p 18823 root@202.122.49.242`
+- **GPU** : A100-SXM4-80GB, CUDA 13.1, vLLM actif (PID 8709, 75 Go VRAM)
+- **Repo** : git à `d880f77` (stale), score_reference.py à jour via SCP
+- **⚠️ Facturée à l'heure — stopper sur vast.ai si plus utilisée**
+
+### Score R-Phase 7 Phase 3 (2026-06-08) — score final après re-run identity
 
 | Arrêt | Type | Score | Méta | Ident | Décis | Profil | Perséc | Docs |
 |---|---|---|---|---|---|---|---|---|
 | CCE 341946 (DPI Burundi) | DPI | 29/48 = **60%** | 6/7 85% | 5/9 55% | 4/8 50% | 12/15 80% | 1/2 50% | 1/1 100% |
-| CCE 341949 (OQT) | non-DPI | 26/48 = **54%** | 6/7 85% | 3/9 33% | 7/8 87% | 6/15 40% | 2/2 100% | 0/1 0%* |
-| CCE 341951 (9bis) | non-DPI | 27/48 = **56%** | 5/7 71% | 2/9 22% | 8/8 100% | 8/15 53% | 2/2 100% | 0/1 0%* |
+| CCE 341949 (OQT) | non-DPI | 26/48 = **54%** | 6/7 85% | 3/9 33% | 7/8 87% | 6/15 40% | 2/2 100% | 0/1 0%† |
+| CCE 341951 (9bis) | non-DPI | 27/48 = **56%** | 5/7 71% | 2/9 22% | 8/8 100% | 8/15 53% | 2/2 100% | 0/1 0%† |
 | CCE 341960 (DPI Guinée) | DPI | 24/48 = **50%** | 6/7 85% | 4/9 44% | 4/8 50% | 8/15 53% | 1/2 50% | 1/1 100% |
 | CCE 341962 (DPI Sénégal) | DPI | 29/48 = **60%** | 6/7 85% | 7/9 77% | 4/8 50% | 8/15 53% | 1/2 50% | 1/1 100% |
-| CCE 341963 (OQT étudiant) | non-DPI | 24/48 = **50%** | 5/7 71% | 2/9 22% | 3/8 37% | 10/15 66% | 2/2 100% | 0/1 0%* |
-| RvV 342046 (DPI NL Russie) | DPI | 24/48 = **50%** | 6/7 85% | 7/11 63% | 5/9 55% | 5/13 38% | 0/1 0% | 1/1 100% |
+| CCE 341963 (OQT étudiant) | non-DPI | 24/48 = **50%** | 5/7 71% | 2/9 22% | 3/8 37% | 10/15 66% | 2/2 100% | 0/1 0%† |
+| RvV 342046 (DPI NL Russie) | DPI | 23/48 = **47%** | 6/7 85% | 6/11 54%‡ | 5/9 55% | 5/13 38% | 0/1 0% | 1/1 100% |
 | RvV 342062 (Dublin NL) | non-DPI | 29/48 = **60%** | 6/7 85% | 7/11 63% | 8/9 88% | 5/13 38% | 1/1 100% | 1/1 100% |
-| **TOTAL** | | **212/384 = 55%** | | | | | | |
+| **TOTAL** | | **211/384 = 54%** | | | | | | |
 
-\* `not_applicable` stocké en base avec `value_text="N/A"` mais non compté par `has_value()` → bug à corriger.
+† `value_text=None` en base (LLM retourne `not_mentioned` pour fr_047 COI malgré la guidance). Nécessite fix analyze.py ou prompts.py.
+‡ Régression 7→6 suite au re-run identity masse (LLM déterministe). Geboorteplaats "Jerevan" perdu.
 
-### Gaps résiduels prioritaires
+### Gaps résiduels prioritaires (après Phase 3)
 
 | Gap | Arrêts touchés | Impact estimé | Piste |
 |---|---|---|---|
-| Bug has_value() score_reference.py | 341949, 341951, 341963 | +3 pts → 56% | `value_text=="N/A"` doit retourner True dans has_value() |
-| identity faible | 341951=2/9, 341963=2/9, 341949=3/9 | ~5 pts | Sexe, ethnie, docs identité absents → re-run identity |
+| docs non-DPI : fr_047 = NULL | 341949, 341951, 341963 | +3 pts → 57% | Renforcer guidance prompts.py evidence_documents group_note |
+| 342046 identity NL régression | 342046 | +1 pt → 55% | Regex injection Geboorteplaats NL |
 | profile_vulnerability NL | 342046=5/13 | ~4 pts | Critères gender-specific NL partiellement capturés |
 | Metadata ≥ 90% | Juge NL = "wnd. voorzitter" sans nom (342046/342062) | ~2 pts | Fallback regex juge NL |
+| identity arrêts 3-sections | 341949=3/9, 341951=2/9, 341963=2/9 | ~1-2 pts | Sexe/Ethnie absents du texte → gain limité |
 
 ### Seuils de validation avocate
 
 | Critère | Seuil | Valeur actuelle | État |
 |---|---|---|---|
-| Score global | ≥ 56% | 55% (212/384) | ⚠️ Proche (+3 avec bug fix) |
-| DPI (341946, 341960, 341962, 342046) | ≥ 65% | ~55% moyen | ❌ |
+| Score global | ≥ 56% | 54% (211/384) | ❌ |
+| DPI (341946, 341960, 341962, 342046) | ≥ 65% | ~52% moyen | ❌ |
 | Metadata (fr/nl 001-005) | ≥ 90% | ~82% | ❌ |
 | Motivation CCE non vide sur DPI | ≥ 3/4 | 4/4 | ✅ |
 | profile_vulnerability DPI | ≥ 13/15 | 341946=12/15 | ⚠️ Proche |
