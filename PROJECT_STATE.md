@@ -1239,68 +1239,193 @@ Gain attendu après fix : +3 pts → 215/384 = 56%.
 
 ## Prochaine action exacte
 
-**R-Phase 9 — Améliorer score DPI vers 65% (sans Vast.ai ou avec)**
+**R-Phase 9 — Préparer 50 arrêts pour validation avocate (instance Vast.ai active)**
 
-### Contexte (après R-Phase 8 — 2026-06-08)
+### Contexte
 
-Score actuel : **214/384 = 55%**. Objectif : ≥ 65% sur DPI avant soumission avocate.
-DPI concernés : 341946 (60%), 341960 (50%), 341962 (60%), 342046 (47%). Moyen = ~54%.
+Score R-Phase 8 : **214/384 = 55%**. Instance Vast.ai active (`ssh -p 18823 root@202.122.49.242`, vLLM PID 8709, ~2€/h).
 
-Les gains les plus accessibles :
-1. **profile_vulnerability NL** (342046 = 5/13 = 38%) : critères gender-specific VGV/mariage/mère célibataire non capturés. Gain potentiel : +4 pts globaux si 342046 monte de 5→9/13.
-2. **identity 342046** : 6/11 → potentiellement 7-8/11 si Religion/Nationalité mieux extraites.
-3. **persecution_claims 342046** : 0/1 (Art. 48/7) absent. Gain potentiel +1 pt.
+**Objectif :** avoir **50 arrêts non-référence analysés** avec le worker R-Phase 8 (prompts à jour), en plus des 8 arrêts de référence déjà frais.
 
-### Option A — Re-run ciblé 342046 groupes faibles (sans vLLM actif sur l'instance)
+**État actuel en base (vérifié 2026-06-08) :**
+- 50 arrêts totaux, tous statut=termine
+- 8 arrêts de référence → analysés avec R-Phase 5-8 (frais ✓)
+- **42 arrêts non-référence** (24 FR + 18 NL) :
+  - 25 ont des valeurs LLM avec les VIEUX prompts (R-Phase 3/4 — qualité inférieure)
+  - 17 n'ont aucune valeur LLM
+  - → tous doivent être (re-)analysés avec les prompts R-Phase 8
+- **8 nouveaux arrêts à scraper** pour atteindre 50 non-référence
 
-Si vLLM est encore actif (PID 8709) :
+### Séquence exacte à exécuter (sans modifier le worker)
+
+**Étape 1 — Vérifier vLLM actif**
 ```bash
 ssh -p 18823 root@202.122.49.242
-ps aux | grep vllm  # vérifier si vLLM actif
+ps aux | grep vllm | grep -v grep
+# Doit afficher vllm.entrypoints.openai.api_server (PID ~8709)
+# Si mort → relancer (voir commande R-Phase 4 dans ce fichier)
+```
+
+**Étape 2 — Purger les vieilles valeurs des 25 non-référence déjà analysés**
+
+Les 8 UUIDs de référence à NE PAS toucher :
+```
+0fd55631-00d4-433c-b599-5fbb75692d16  CCE 341946
+e62bfb49-8e15-45f9-95d5-2c558c2571d4  CCE 341949
+b3adae70-1776-4c6c-846f-0d0776ae742b  CCE 341951
+464635d4-0f8b-4b98-a408-6b5f674ac249  CCE 341960
+02552ae3-ae24-40ed-9918-98a5e69f0f16  CCE 341962
+6f490a37-224c-4b96-92e9-97b740ede7c4  CCE 341963
+08e588e6-62dc-4c41-adc8-d0fd5dd965e6  RvV 342046
+ff586b0e-0ca2-4c40-b3ca-f0dac25811d8  RvV 342062
+```
+
+```bash
 cd /workspace/saas-juridique/worker
-# SCP les fichiers modifiés si nouvelle session :
-# scp -P 18823 worker/prompts.py worker/analyze.py root@202.122.49.242:/workspace/saas-juridique/worker/
-PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --arret-id 08e588e6-62dc-4c41-adc8-d0fd5dd965e6 --group profile_vulnerability
-PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --arret-id 08e588e6-62dc-4c41-adc8-d0fd5dd965e6 --group persecution_claims
-PYTHONIOENCODING=utf-8 .venv/bin/python score_reference.py --verbose
+PYTHONIOENCODING=utf-8 .venv/bin/python - << 'PYEOF'
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv(Path("..") / ".env.local")
+from supabase import create_client
+sb = create_client(os.environ["NEXT_PUBLIC_SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
+
+REFERENCE_IDS = {
+    "0fd55631-00d4-433c-b599-5fbb75692d16",
+    "e62bfb49-8e15-45f9-95d5-2c558c2571d4",
+    "b3adae70-1776-4c6c-846f-0d0776ae742b",
+    "464635d4-0f8b-4b98-a408-6b5f674ac249",
+    "02552ae3-ae24-40ed-9918-98a5e69f0f16",
+    "6f490a37-224c-4b96-92e9-97b740ede7c4",
+    "08e588e6-62dc-4c41-adc8-d0fd5dd965e6",
+    "ff586b0e-0ca2-4c40-b3ca-f0dac25811d8",
+}
+
+r = sb.table("arrets").select("id,numero").eq("statut_traitement","termine").execute()
+non_ref_ids = [a["id"] for a in r.data if a["id"] not in REFERENCE_IDS]
+print(f"Arrêts non-référence à purger : {len(non_ref_ids)}")
+
+# Purger par blocs de 50
+for i in range(0, len(non_ref_ids), 50):
+    batch = non_ref_ids[i:i+50]
+    sb.table("arret_criteria_values").delete().in_("arret_id", batch).execute()
+    sb.table("model_runs").delete().in_("arret_id", batch).execute()
+    print(f"  Purgé bloc {i//50+1} ({len(batch)} arrêts)")
+
+print("Purge terminée. 8 arrêts de référence préservés.")
+PYEOF
 ```
 
-### Option B — Extraire type_decision + resume_ai (sans GPU, local Ollama)
+**Étape 3 — Re-analyser les 42 non-référence existants**
+```bash
+# Vérifier que les 42 n'ont plus de valeurs
+PYTHONIOENCODING=utf-8 .venv/bin/python - << 'PYEOF'
+import os; from pathlib import Path; from dotenv import load_dotenv
+load_dotenv(Path("..") / ".env.local")
+from supabase import create_client
+sb = create_client(os.environ["NEXT_PUBLIC_SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
+r = sb.table("arrets").select("id").eq("statut_traitement","termine").execute()
+tot = len(r.data)
+done = sb.table("arret_criteria_values").select("arret_id").limit(5000).execute()
+done_ids = {d["arret_id"] for d in done.data}
+pending = [a for a in r.data if a["id"] not in done_ids]
+print(f"Total arrêts termine : {tot} | Avec valeurs : {len(done_ids)} | À analyser : {len(pending)}")
+PYEOF
 
-Ces deux champs sont attendus par l'UI mais non extraits par le worker :
-- `type_decision` : regex sur dispositif (`"annule"` → `annulation`, `"confirme"` → `confirmation`, etc.)
-- `resume_ai` : nouveau groupe LLM `"summary"` → appel Ollama local
+# Lancer en batch avec concurrence 4 (A100 peut gérer 4 arrêts en parallèle)
+nohup .venv/bin/python analyze.py --limit 50 --concurrency 4 \
+  > /workspace/saas-juridique/logs/analyze_batch_rp9.log 2>&1 &
+echo "PID: $!"
+tail -f /workspace/saas-juridique/logs/analyze_batch_rp9.log
+```
 
-Peut se faire localement sans Vast.ai. Unbloque le donut stats + Résumé IA dans l'UI.
+**Étape 4 — Scraper 8 nouveaux arrêts (pour atteindre 50 non-référence)**
+```bash
+# Après que les 42 soient analysés :
+# Scraper 5 nouveaux FR + 3 nouveaux NL
+PYTHONIOENCODING=utf-8 .venv/bin/python scraper.py --lang fr --limit 5
+PYTHONIOENCODING=utf-8 .venv/bin/python scraper.py --lang nl --limit 3
 
-### ⚠️ Instance Vast.ai (TOUJOURS ACTIVE)
+# Extraire les PDF des nouveaux
+PYTHONIOENCODING=utf-8 .venv/bin/python main.py --limit 8
 
-- **SSH** : `ssh -p 18823 root@202.122.49.242`
-- **GPU** : A100-SXM4-80GB, vLLM probablement encore actif (PID 8709)
-- **Repo** : git à `d880f77` (stale) — toujours utiliser SCP pour les fichiers worker
-- **⚠️ Facturée à l'heure — stopper sur vast.ai dès que plus utilisée**
+# Analyser les nouveaux
+PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --limit 8 --concurrency 4
+```
 
-### Prompt recommandé pour la prochaine session
+**Étape 5 — Vérification finale + rapport**
+```bash
+PYTHONIOENCODING=utf-8 .venv/bin/python - << 'PYEOF'
+import os; from pathlib import Path; from dotenv import load_dotenv
+load_dotenv(Path("..") / ".env.local")
+from supabase import create_client
+sb = create_client(os.environ["NEXT_PUBLIC_SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
+r = sb.table("arrets").select("id,numero,langue,statut_traitement").order("numero").execute()
+done = sb.table("arret_criteria_values").select("arret_id").limit(10000).execute()
+done_ids = {d["arret_id"] for d in done.data}
+analyse_ok = [a for a in r.data if a["id"] in done_ids]
+print(f"Arrêts totaux : {len(r.data)}")
+print(f"Arrêts analysés : {len(analyse_ok)}")
+print(f"FR analysés : {sum(1 for a in analyse_ok if a['langue']=='fr')}")
+print(f"NL analysés : {sum(1 for a in analyse_ok if a['langue']=='nl')}")
+PYEOF
+
+# Lancer le score de référence pour vérifier qu'on n'a pas régressé
+PYTHONIOENCODING=utf-8 .venv/bin/python score_reference.py
+```
+
+**Étape 6 — Stopper l'instance Vast.ai**
+- Aller sur https://vast.ai → instances → Destroy (ou Stop si on veut garder le disque)
+
+### Durée estimée
+
+| Étape | Durée estimée |
+|---|---|
+| Purge vieilles valeurs | ~1 min |
+| Re-analyser 42 arrêts (concurrence 4) | ~35-45 min |
+| Scraper 8 nouveaux | ~3 min |
+| Extraire 8 PDF (main.py) | ~10-15 min |
+| Analyser 8 nouveaux | ~7 min |
+| **Total** | **~60 min (~2€ sur Vast.ai)** |
+
+### ⚠️ Règles absolues pour cette session
+
+- **Ne PAS modifier** `worker/prompts.py`, `worker/analyze.py` ni aucun autre fichier worker
+- **Ne PAS toucher** aux 8 arrêts de référence (ne pas purger leurs valeurs)
+- **Ne PAS lancer** `analyze_reference.py` (risque de régression sur les 8 référence)
+- Toujours utiliser SCP si un fichier local doit être transféré (git stale à `d880f77`)
+- Stopper l'instance Vast.ai après la session
+
+### Prompt de reprise (autosuffisant — à coller après /clear)
 
 ```
-R-Phase 8 terminée (2026-06-08) — score 214/384 = 55%.
-Commit `41f59a4` pushé. Instance Vast.ai : ssh -p 18823 root@202.122.49.242 (vLLM PID 8709, A100-SXM4-80GB, TOUJOURS ACTIVE).
+R-Phase 8 terminée (2026-06-08). Score référence : 214/384 = 55%. Commit `41f59a4` pushé (main).
 
-Objectif R-Phase 9 :
-Améliorer le score DPI (341946=60%, 341960=50%, 341962=60%, 342046=47%) vers ≥ 65%.
+Instance Vast.ai ACTIVE : ssh -p 18823 root@202.122.49.242 (A100-SXM4-80GB, vLLM PID 8709 — vérifier d'abord).
+Worker sur instance : git stale d880f77 + SCP prompts.py+analyze.py R-Phase 8. Ne PAS git pull, toujours SCP.
 
-Gaps prioritaires pour 342046 (DPI NL, le plus faible à 47%) :
-- profile_vulnerability : 5/13 = 38% (VGV, mariage forcé, mère célibataire NL non capturés)
-- persecution_claims : 0/1 (Art. 48/7 absent)
-- identity : 6/11 (Religion/Ethnie vides)
+OBJECTIF SESSION : re-analyser les 42 arrêts non-référence avec les prompts R-Phase 8 + scraper 8 nouveaux pour avoir 50 arrêts non-référence analysés pour l'avocate. NE PAS modifier le worker.
 
-UUIDs :
-- 342046 → 08e588e6-62dc-4c41-adc8-d0fd5dd965e6
+ÉTAT BASE :
+- 50 arrêts totaux (statut=termine), dont 8 arrêts de référence (valeurs fraîches à NE PAS toucher)
+- 42 non-référence : 25 avec vieilles valeurs (R-Phase 3/4), 17 sans valeurs → purger les 25 + analyser les 42
+- 8 nouveaux arrêts à scraper (5 FR + 3 NL) pour atteindre 50 non-référence
 
-Règles ABSOLUES :
-- Toujours utiliser --arret-id + --group pour cibler, jamais analyze_reference.py sans --group
-- Utiliser SCP pour transférer les fichiers worker sur l'instance (git stale à d880f77)
-- Stopper l'instance Vast.ai après la session si plus utilisée
+SÉQUENCE EXACTE (sans modifier le worker) :
+1. Vérifier vLLM actif : ssh -p 18823 root@202.122.49.242 && ps aux | grep vllm
+2. Purger valeurs non-référence (script Python en ligne — voir PROJECT_STATE.md section "Prochaine action exacte")
+3. Re-analyser 42 : analyze.py --limit 50 --concurrency 4 (nohup, ~40 min)
+4. Scraper 8 nouveaux : scraper.py --lang fr --limit 5 && scraper.py --lang nl --limit 3
+5. Extraire + analyser les 8 : main.py --limit 8 && analyze.py --limit 8 --concurrency 4
+6. Vérification + score_reference.py (ne pas régresser les 8 référence)
+7. Stopper l'instance Vast.ai
+
+UUIDs de référence (NE PAS purger) :
+341946→0fd55631, 341949→e62bfb49, 341951→b3adae70, 341960→464635d4
+341962→02552ae3, 341963→6f490a37, 342046→08e588e6, 342062→ff586b0e
+
+Commande vLLM si morte :
+nohup /workspace/saas-juridique/worker/.venv/bin/python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-72B-Instruct-AWQ --port 8000 --dtype auto --max-model-len 16384 --gpu-memory-utilization 0.92 --trust-remote-code --enforce-eager > /workspace/saas-juridique/logs/vllm.log 2>&1 &
 ```
 
 ### Score R-Phase 7 Phase 3 (2026-06-08) — score final après re-run identity
