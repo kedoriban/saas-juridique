@@ -297,13 +297,24 @@ def build_prompt(
         "status":            "not_mentioned",
     }, ensure_ascii=False)
 
-    # Note de concision pour evidence_documents : évite que le LLM liste tous les COI en détail
+    # Note pour evidence_documents : concision COI (DPI) ou not_applicable forcé (non-DPI)
     group_note = ""
     if group == "evidence_documents":
-        group_note = (
-            "\n⚠️ COI : pour chaque rapport cité, retourne le titre et l'auteur uniquement "
-            "(max 200 chars par 'value'). Ne reproduis PAS le contenu des rapports."
-        )
+        if procedure_type not in ("protection_internationale_fond", "unknown"):
+            # Non-DPI confirmé : les COI pays d'origine ne s'appliquent pas
+            group_note = (
+                "\n⚠️ RÈGLE ABSOLUE — PROCÉDURE NON-DPI : "
+                f"Cet arrêt porte sur le séjour ({procedure_type}), PAS sur l'asile/DPI. "
+                "Tous les critères de ce groupe (COI, rapports pays d'origine) doivent retourner "
+                "status=\"not_applicable\" et value=\"N/A\". "
+                "Les rapports COI ne concernent que les dossiers d'asile (DPI). "
+                "NE PAS retourner not_mentioned — retourner not_applicable obligatoirement."
+            )
+        else:
+            group_note = (
+                "\n⚠️ COI : pour chaque rapport cité, retourne le titre et l'auteur uniquement "
+                "(max 200 chars par 'value'). Ne reproduis PAS le contenu des rapports."
+            )
 
     user_prompt = f"""Langue du document : {lang_label} ({language})
 Groupe de critères : {group}

@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -99,8 +100,7 @@ def _inject_regex_metadata(
     # C'est la source la plus fiable — vient du scraper, pas du PDF.
     _canonical_number: str | None = None
     if arret_numero:
-        import re as _re
-        m = _re.search(r"(\d{5,7})", arret_numero)
+        m = re.search(r"(\d{5,7})", arret_numero)
         if m:
             _canonical_number = m.group(1)
     items_by_id: dict[str, dict] = {item["criterion_id"]: item for item in items}
@@ -167,6 +167,80 @@ def _inject_regex_metadata(
         if item.get("criterion_id") not in seen:
             result.append(item)
     return result
+
+# ---------------------------------------------------------------------------
+# Injection regex — groupe identity NL (Geboorteplaats)
+# ---------------------------------------------------------------------------
+
+# "geboren op [...]1976 in Jerevan" → capture la ville
+_RE_GEBOREN_IN = re.compile(
+    r"geboren\b[^.]{0,80}?\bin\s+([A-ZÀ-Ü][a-zA-Zà-ü\-]{2,30})",
+    re.IGNORECASE,
+)
+
+# Slug partiel qui identifie le critère NL geboorteplaats (tronqué en base)
+_GEBOORTEPLAATS_SLUG_PART = "geboorteplaats"
+
+
+def _inject_regex_identity_nl(
+    items: list[dict],
+    criteria: list[dict],
+    intermediate: IntermediateDocument,
+) -> list[dict]:
+    """
+    Injecte Geboorteplaats (birthplace) par regex pour le groupe identity NL
+    quand le LLM retourne not_mentioned ou laisse le critère vide.
+    Pattern : "geboren [...] in <Ville>" dans le texte des sections.
+    """
+    # Trouver le critère geboorteplaats dans la liste
+    birth_crit = next(
+        (c for c in criteria if _GEBOORTEPLAATS_SLUG_PART in (c.get("slug") or "")),
+        None,
+    )
+    if not birth_crit:
+        return items
+
+    cid = birth_crit["id"]
+    items_by_id = {item["criterion_id"]: item for item in items}
+    existing = items_by_id.get(cid)
+
+    # N'injecter que si le LLM n'a rien trouvé (absent, vide, ou not_mentioned)
+    if existing and existing.get("status") == "found" and existing.get("value"):
+        return items
+
+    # Concaténer tout le texte disponible
+    full_text = "\n".join(sec.text for sec in intermediate.sections if sec.text)
+    m = _RE_GEBOREN_IN.search(full_text)
+    if not m:
+        return items
+
+    city = m.group(1).strip()
+    items_by_id[cid] = {
+        "criterion_id":        cid,
+        "value":               city,
+        "confidence":          0.90,
+        "evidence_excerpt":    m.group(0)[:150],
+        "source_authority":    "RvV",
+        "source_section":      None,
+        "needs_human_review":  False,
+        "status":              "found",
+        "expected_value_type": birth_crit.get("expected_value_type"),
+    }
+    print(f"    [REGEX] Geboorteplaats injectée : '{city}'")
+
+    # Reconstituer dans l'ordre des critères
+    result: list[dict] = []
+    seen: set[str] = set()
+    for c in criteria:
+        c2 = c["id"]
+        if c2 in items_by_id:
+            result.append(items_by_id[c2])
+            seen.add(c2)
+    for item in items:
+        if item.get("criterion_id") not in seen:
+            result.append(item)
+    return result
+
 
 _INTERMEDIATE_DIR = Path(__file__).parent.parent / ".tmp" / "intermediate"
 
@@ -621,6 +695,9 @@ def analyze_arret(
                 items, group_criteria, intermediate,
                 language=language, arret_numero=numero,
             )
+        # Fix NL identity : Geboorteplaats souvent manqué par le LLM (non-déterministe)
+        elif group == "identity" and language == "nl":
+            items = _inject_regex_identity_nl(items, group_criteria, intermediate)
 
         all_items.extend(items)
 
