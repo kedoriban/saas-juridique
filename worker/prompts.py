@@ -26,7 +26,7 @@ GROUP_MAX_CHARS: dict[str, int] = {
     "decision_reasoning": 16000,
     "profile_vulnerability": 10000,
     "persecution_claims": 20000,   # acte_attaque + corpus_arret + conclusion_cgra_ou_oe
-    "evidence_documents": 12000,   # inventaire COI dans acte_attaque parfois > 6500 chars
+    "evidence_documents": 25000,   # sections CCE/acte_attaque peuvent dépasser 40 000 chars ; COI à ~22 000+ chars
 }
 
 # Mapping groupe → section_ids prioritaires (ordre de pertinence).
