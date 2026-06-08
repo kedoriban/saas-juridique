@@ -97,8 +97,11 @@ for v in values_res.data:
 # 4. Calculer les scores
 # --------------------------------------------------------------------------
 def has_value(v: dict) -> bool:
-    """Vrai si la valeur extraite est non nulle et non vide."""
-    return bool(v.get("value_text")) or v.get("value_boolean") is not None
+    """True si la valeur est non vide, y compris not_applicable stocké comme 'N/A'."""
+    vt = v.get("value_text")
+    if vt == "N/A":  # not_applicable explicite — toujours compté comme couvert
+        return True
+    return bool(vt) or v.get("value_boolean") is not None
 
 print("\n" + "=" * 80)
 print(f"{'ARRÊT':25s}  {'LANG':4s}  {'TOTAL':7s}  {'MÉTA':6s}  {'IDENT':6s}  {'DÉCIS':6s}  {'PROFIL':7s}  {'PERSÉC':7s}  {'DOCS':5s}")
