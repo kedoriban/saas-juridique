@@ -315,7 +315,19 @@ def store_criteria_values(
             "needs_human_review": item.get("needs_human_review", False),
         })
     if rows:
-        client.table("arret_criteria_values").upsert(rows, on_conflict="arret_id,criterion_id").execute()
+        # Dédupliquer par criterion_id : garder l'item avec la confiance la plus haute
+        # (le LLM peut retourner plusieurs items pour le même critère, ex. multi-COI)
+        seen: dict[str, dict] = {}
+        for row in rows:
+            cid = row["criterion_id"]
+            if cid not in seen:
+                seen[cid] = row
+            else:
+                prev_conf = seen[cid].get("confidence") or 0.0
+                curr_conf = row.get("confidence") or 0.0
+                if curr_conf >= prev_conf:
+                    seen[cid] = row
+        client.table("arret_criteria_values").upsert(list(seen.values()), on_conflict="arret_id,criterion_id").execute()
 
 
 def store_processing_job(client, arret_id: str, status: str, error: str | None = None) -> None:

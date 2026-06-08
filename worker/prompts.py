@@ -26,7 +26,16 @@ GROUP_MAX_CHARS: dict[str, int] = {
     "decision_reasoning": 16000,
     "profile_vulnerability": 10000,
     "persecution_claims": 20000,   # acte_attaque + corpus_arret + conclusion_cgra_ou_oe
-    "evidence_documents": 25000,   # sections CCE/acte_attaque peuvent dépasser 40 000 chars ; COI à ~22 000+ chars
+    "evidence_documents": 25000,   # 40 000 cause explosion tokens (acte_attaque_2 > 38 000 chars sur DPI) ; 341962 COI à pos 29 753 = cas limite accepté
+}
+
+# Plafond par section-type pour un groupe (évite qu'une section absorbe tout le budget).
+# Ex : acte_attaque_2 de 341960 = 38 853 chars → explosion output tokens à 40 000 budget.
+GROUP_SECTION_MAX: dict[str, dict[str, int]] = {
+    "evidence_documents": {
+        "acte_attaque":          10000,  # acte_attaque_2 peut dépasser 38 000 chars
+        "bestreden_beslissing":  10000,
+    }
 }
 
 # Mapping groupe → section_ids prioritaires (ordre de pertinence).
@@ -104,10 +113,12 @@ GROUP_SECTIONS: dict[str, list[str]] = {
         "arguments", "faits", "analyse",
     ],
     "evidence_documents": [
-        # acte_attaque contient souvent l'inventaire COI
+        # acte_attaque en premier (COI souvent cité tôt) — mais capé à 10 000 chars par GROUP_SECTION_MAX
         "acte_attaque", "bestreden_beslissing",
-        "motivation_cgra_ou_oe", "motivering_cgvs_of_dv",
+        # conclusion ensuite : pour 341962 le COI est à pos ~30 000 chars (34 922 chars total)
+        # → budget restant = 40 000 - min(acte_attaque, 10 000) ≥ 30 000 → conclusion entière incluse
         "conclusion_cgra_ou_oe", "conclusie_cgvs_of_dv",
+        "motivation_cgra_ou_oe", "motivering_cgvs_of_dv",
         "nouveaux_elements", "nieuwe_elementen",
         "faits_invokes", "feitenrelaas",
         "corps_arret", "corps_uitspraak",
@@ -148,7 +159,7 @@ Valeurs autorisées pour "status" :
   error           = impossible d'analyser ce critère
 
 Détection du type de procédure (important pour not_applicable) :
-- Si l'arrêt concerne UNIQUEMENT le séjour (OQT, 9bis, Dublin, visa étudiant, regroupement familial, cohabitation légale) et NON une DPI (demande de protection internationale/asile), utilise status="not_applicable" pour les critères exclusivement liés à l'asile : MGF/VGV, mariage forcé, crainte de persécution, crédibilité du récit d'asile, art. 48/7, agents de persécution, protection nationale au sens DPI, groupe social art. 48/3, durée procédure DPI.
+- Si l'arrêt concerne UNIQUEMENT le séjour (OQT, 9bis, Dublin, visa étudiant, regroupement familial, cohabitation légale) et NON une DPI (demande de protection internationale/asile), utilise status="not_applicable" pour les critères exclusivement liés à l'asile : MGF/VGV, mariage forcé, crainte de persécution, crédibilité du récit d'asile, art. 48/7, agents de persécution, protection nationale au sens DPI, groupe social art. 48/3, durée procédure DPI, rapports COI/documents sur le pays d'origine cités.
 - Les critères de métadonnées (date, numéro, juge, avocat, chambre) et la nationalité restent applicables à TOUS les types d'arrêts.
 - Indices d'un arrêt NON-DPI : absence de "CGRA/CGVS", présence d'"OQT" / "ordre de quitter le territoire" / "9bis" / "Dublin" / "séjour étudiant" comme objet principal.
 
@@ -188,12 +199,19 @@ def select_sections(
     if not candidates:
         return []
 
+    section_caps = GROUP_SECTION_MAX.get(group, {})
     result: list[SectionEntry] = []
     total = 0
     for sec in candidates:
         text = (sec.text or "").strip()
         if not text:
             continue
+        # Appliquer le cap par section-type si défini
+        for sid_prefix, cap in section_caps.items():
+            if (sec.section_id or "").startswith(sid_prefix):
+                if len(text) > cap:
+                    text = text[:cap] + "\n[… tronqué (cap section) …]"
+                break
         if total + len(text) > effective_max:
             remaining = effective_max - total
             if remaining > 200:
@@ -279,9 +297,17 @@ def build_prompt(
         "status":            "not_mentioned",
     }, ensure_ascii=False)
 
+    # Note de concision pour evidence_documents : évite que le LLM liste tous les COI en détail
+    group_note = ""
+    if group == "evidence_documents":
+        group_note = (
+            "\n⚠️ COI : pour chaque rapport cité, retourne le titre et l'auteur uniquement "
+            "(max 200 chars par 'value'). Ne reproduis PAS le contenu des rapports."
+        )
+
     user_prompt = f"""Langue du document : {lang_label} ({language})
 Groupe de critères : {group}
-Type de procédure : {procedure_type}{proc_note}
+Type de procédure : {procedure_type}{proc_note}{group_note}
 
 ## SECTIONS DE L'ARRÊT ({len(sections)} section(s), {total_chars} caractères)
 {joined}

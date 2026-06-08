@@ -1,20 +1,22 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-08 (R-Phase 5 Phase 6 terminée — score 34%→54%, vLLM stoppé, instance Vast.ai à stopper manuellement)
+Dernière mise à jour : 2026-06-08 (R-Phase 7 Phase 2 terminée — score 212/384 = 55%, instance Vast.ai toujours active)
 
 ## Objectifs en cours
 
-1. **⚠️ ARRÊTER l'instance Vast.ai** (`ssh -p 18823 root@202.122.49.242`) — vLLM stoppé mais instance encore facturée.
-2. **Pusher les commits locaux** sur GitHub (`git push`).
-3. **Validation avocate** — Objectif révisé : ≥ 70% sur DPI uniquement (54% global atteint, 90% inaccessible à court terme).
-4. **Gaps restants prioritaires** : identity (2-3/9 sur arrêts courts), COI evidence_documents (0% sur 5/8 arrêts), profile_vulnerability NL (342046 = 5/13).
-5. ~~R-Phase 5 Phase 6~~ — **Terminée** (2026-06-08) : MGF guidance + empty-string fix + re-run DPI, score 50%→54%.
-6. ~~R-Phase 5 Phase 5~~ — **Terminée** (2026-06-08) : procedure_type not_applicable + acte_attaque persecution_claims, score 34%→50%.
-7. ~~R-Phase 5 Phase 4~~ — **Terminée** (2026-06-08) : 8/8 arrêts analysés 72B, score baseline 131/384 = 34%.
-8. ~~R-Phase 5 Phase 3~~ — **Terminée** (2026-06-07) : 8 bugs identifiés + 6 corrections prompts/analyze.
-9. ~~R-Phase 5 Phase 2~~ — **Terminée** (2026-06-07) : 4 fixes worker + 8/8 metadata stockés.
-10. ~~R-Phase 5 Phase 1~~ — **Terminée** (2026-06-07) : Fix header + regex injection + metadata amélioré.
-11. ~~R-Phase 4~~ — **Terminée** (2026-06-07) : 72B sur A100 80 Go, ~48 valeurs/arrêt.
+1. **Bug score_reference.py** : `has_value()` ne compte pas `not_applicable` comme valide pour le groupe `docs` → 341949/341951/341963 affichent "VIDE" alors que "N/A" est stocké en base.
+2. **R-Phase 7 Phase 3** : corriger `score_reference.py` puis re-scorer. Gain attendu : +3 pts → ~58%.
+3. **Gaps suivants** : identity faible (341951=2/9, 341963=2/9, 341949=3/9) + profile_vulnerability NL (342046=5/13).
+4. **Validation avocate** — Objectif révisé : ≥ 65% sur DPI uniquement (actuel 55% global, ~54% moyen DPI).
+5. ~~R-Phase 7 Phase 2~~ — **Terminée** (2026-06-08) : re-run evidence_documents, score 209→212/384. COI trouvé sur 341946/341960/341962/342046. not_applicable stocké pour 341949/341951/341963 (non compté dans le score = bug). Fixes : GROUP_SECTION_MAX, section order, dédup criterion_id.
+6. ~~R-Phase 7 Phase 1~~ — **Terminée** (2026-06-08) : fix prompts.py 25000 chars, commit `cb1c724`, pushé.
+7. ~~R-Phase 5 Phase 6~~ — **Terminée** (2026-06-08) : MGF guidance + empty-string fix + re-run DPI, score 50%→54%.
+8. ~~R-Phase 5 Phase 5~~ — **Terminée** (2026-06-08) : procedure_type not_applicable + acte_attaque persecution_claims, score 34%→50%.
+9. ~~R-Phase 5 Phase 4~~ — **Terminée** (2026-06-08) : 8/8 arrêts analysés 72B, score baseline 131/384 = 34%.
+10. ~~R-Phase 5 Phase 3~~ — **Terminée** (2026-06-07) : 8 bugs identifiés + 6 corrections prompts/analyze.
+11. ~~R-Phase 5 Phase 2~~ — **Terminée** (2026-06-07) : 4 fixes worker + 8/8 metadata stockés.
+12. ~~R-Phase 5 Phase 1~~ — **Terminée** (2026-06-07) : Fix header + regex injection + metadata amélioré.
+13. ~~R-Phase 4~~ — **Terminée** (2026-06-07) : 72B sur A100 80 Go, ~48 valeurs/arrêt.
 
 ---
 
@@ -503,6 +505,9 @@ Migration 009 (20 min)
 - **R-Phase 5 Phase 6** : guidance SYSTEM_PROMPT DPI — MGF/Réexcision/Désinfibulation = `not_applicable` si DPI non-MGF ; mère célibataire = `not_applicable` si requérant masculin ou en couple. `if not value_text` au lieu de `if value_text is None` dans `store_criteria_values`. Score 50%→54%.
 - **Objectif validation avocate révisé** : 90% global inaccessible à court terme. Cible révisée : ≥ 65% sur DPI uniquement avant soumission.
 - **vLLM commande validée Phase 4** (A100 80 Go, CUDA 13.2, sans XFORMERS) : `--enforce-eager --max-model-len 16384 --gpu-memory-utilization 0.92` — référence pour la prochaine session Vast.ai.
+- **R-Phase 7 Phase 2 — fixes evidence_documents** : GROUP_SECTION_MAX (acte_attaque cap 10 000 chars), section order (acte_attaque → conclusion → motivation), dédup criterion_id dans store_criteria_values, group_note concision (max 200 chars/value), COI ajouté à not_applicable non-DPI dans SYSTEM_PROMPT. Score 209→212/384.
+- **Bug has_value() score_reference.py** : `value_text="N/A"` (not_applicable) non compté comme valide pour docs → 341949/341951/341963 affichent 0/1 alors que N/A est en base. À corriger avant prochain re-scoring.
+- **instance Vast.ai (2026-06-08)** : `ssh -p 18823 root@202.122.49.242`, A100-SXM4-80GB, vLLM PID 8709 actif, git à `d880f77` (fichiers worker à jour via SCP). **Toujours facturée.**
 
 ## Stack retenue
 
@@ -1044,90 +1049,160 @@ Gain estimé : **+30 à +50 items** → score estimé **~41-47%**
 | rapport médical 341946 | Information dans acte_attaque après position 10000 chars | Investiguer section dans intermediate |
 | 90% inatteignable à court terme | Problème structurel : arrêts non-DPI avec 3 sections → tout dans faits_invokes | Refactoriser section extraction non-DPI |
 
+## R-Phase 7 — Phase 1 : fix COI (2026-06-08)
+
+### Diagnostic
+
+Dry-run `evidence_documents` sur CCE 341960 (DPI Guinée, UUID `464635d4-0f8b-4b98-a408-6b5f674ac249`) :
+- `acte_attaque_1` = 2 049 chars (CGRA faits invoqués)
+- `acte_attaque_2` = **40 375 chars** (CCE appréciation complète — mislabeled CGRA)
+- Avec limite 12 000 : budget restant pour `acte_attaque_2` = 9 951 chars → COI à ~22 200 chars : **TRONQUÉ**
+- Même problème : 342046 `bestreden_beslissing` = 23 512 chars ; 341962 `motivation_cgra_ou_oe` = 43 500 chars
+
+### Fix appliqué
+
+`worker/prompts.py` ligne 29 : `"evidence_documents": 12000` → `25000`
+
+Vérification post-fix :
+- 341960 : COI "COI-Focus Guinée, situation politique" visible à pos 23 638 / 25 015 ✅
+- 342046 : `bestreden_beslissing` (23 512 chars) rentre entièrement dans 25 000 ✅
+- Non-DPI (341949, 341951, 341963) : Phase 6 empty-string fix → "N/A" stocké lors du prochain re-run ✅
+- 341962 : incertain — COI = "articles de presse sur l'homophobie au Sénégal" peut être dans les 21 201 chars de `motivation_cgra_ou_oe` accessibles
+
+### Commit
+
+`cb1c724` — pushé sur GitHub (2026-06-08)
+
+### Valeurs attendues COI par arrêt (RESULTAT ATTENDU.md)
+
+| Arrêt | Valeur attendue |
+|---|---|
+| 341946 DPI Burundi | COI Focus Burundi 2025 + HRW + Amnesty + US Dept State + Iwacu + Ligue Iteka + ACLED |
+| 341960 DPI Guinée | COI-Focus Guinée, situation politique + COI MGF Guinée |
+| 341962 DPI Sénégal | Articles de presse sur l'homophobie au Sénégal produits par la requérante |
+| 342046 DPI NL Russie | EUAA The Russian Federation - Political dissent + EUAA COI Query + Algemeen ambtsbericht |
+| 341949 OQT | Aucun rapport pertinent cité → `not_applicable` |
+| 341951 9bis | Aucun → `not_applicable` |
+| 341963 OQT étudiant | Aucun → `not_applicable` |
+| 342062 Dublin NL | Aucun → `not_applicable` |
+
+### Gain estimé
+
+Score actuel : 54% (209/384). Gain attendu : +5 à +6 pts → ~56-57% (209→214-215/384).
+
+---
+
+## R-Phase 7 — Phase 2 : bilan (2026-06-08)
+
+### Score final : 212/384 = 55% (+3 pts vs 209)
+
+| Arrêt | Docs avant | Docs après | COI stocké |
+|---|---|---|---|
+| 341946 DPI Burundi | 1/1 ✅ | 1/1 ✅ | JSON COI Burundi (7 refs) |
+| 341960 DPI Guinée | 0/1 ❌ | 1/1 ✅ | COI-Focus Guinée |
+| 341962 DPI Sénégal | 0/1 ❌ | 1/1 ✅ | Informations personnes homosexuelles au Sénégal |
+| 341949 OQT | 0/1 ❌ | not_applicable stocké (VIDE dans score) | bug has_value() |
+| 341951 9bis | 0/1 ❌ | not_applicable stocké (VIDE dans score) | bug has_value() |
+| 341963 OQT étudiant | 0/1 ❌ | not_applicable stocké (VIDE dans score) | bug has_value() |
+| 342046 DPI NL Russie | 1/1 ✅ | 1/1 ✅ | EUAA Russia (2 refs) |
+| 342062 Dublin NL | 1/1 ✅ | 1/1 ✅ | stable |
+
+### Fixes appliqués (session 2026-06-08)
+
+| Fix | Fichier | Détail |
+|---|---|---|
+| GROUP_SECTION_MAX | `worker/prompts.py` | Cap acte_attaque/bestreden_beslissing à 10 000 chars (acte_attaque_2 de 341960 = 38 853 chars → explosion 4096 tokens) |
+| Section order evidence_documents | `worker/prompts.py` | conclusion_cgra_ou_oe avant motivation_cgra_ou_oe (COI Sénégal à pos 29 753 dans conclusion) |
+| Dédup criterion_id | `worker/analyze.py` | `store_criteria_values` : garder item confiance max si LLM retourne plusieurs items pour le même criterion_id (sinon erreur ON CONFLICT Supabase) |
+| not_applicable COI non-DPI | `worker/prompts.py` | SYSTEM_PROMPT + group_note evidence_documents : COI = not_applicable pour OQT/9bis/Dublin |
+| group_note concision | `worker/prompts.py` | Max 200 chars par value pour COI (évite output JSON trop long) |
+
+### Bug score_reference.py à corriger
+
+`has_value()` dans `score_reference.py` ne reconnaît pas `value_text="N/A"` avec `status=not_applicable` comme valeur valide pour le groupe `docs`.
+
+Conséquence : 341949, 341951, 341963 affichent `0/1` pour docs alors que "N/A" est stocké en base.
+
+Correction probable dans `score_reference.py` : `has_value()` doit retourner True si `value_text == "N/A"` (not_applicable).
+
+Gain attendu après fix : +3 pts → 215/384 = 56%.
+
+### Instance Vast.ai
+
+- **Toujours active** : `ssh -p 18823 root@202.122.49.242`
+- vLLM : **actif** (PID 8709, A100-SXM4-80GB, CUDA 13.1)
+- Repo : `/workspace/saas-juridique` — git est en retard (commit `d880f77`), tous les worker files sont à jour via SCP
+- Fichiers à jour sur l'instance : `worker/prompts.py`, `worker/analyze.py`, `worker/analyze_reference.py`, `worker/score_reference.py`
+- **⚠️ Facturée à l'heure — stopper dès que possible si plus utilisée**
+
+---
+
 ## Prochaine action exacte
 
-**R-Phase 5 terminée — Priorité immédiate : stopper l'instance Vast.ai + pusher les commits**
+**R-Phase 7 Phase 3 — Corriger `score_reference.py` puis re-run identity**
 
 ### Actions immédiates (dans cet ordre)
 
-1. **Stopper l'instance Vast.ai** sur [vast.ai/instances](https://vast.ai/instances) — vLLM stoppé mais instance toujours facturée (~2€/h).
+1. **Corriger `score_reference.py`** : `has_value()` doit compter `value_text="N/A"` (not_applicable) comme valide. Gain attendu : +3 pts → 215/384 = 56%.
 
-2. **Pusher les commits locaux** :
+2. **Re-scorer** après correction :
+```bash
+ssh -p 18823 root@202.122.49.242
+cd /workspace/saas-juridique/worker
+PYTHONIOENCODING=utf-8 .venv/bin/python score_reference.py --verbose
+```
+
+3. **Re-run identity** sur les arrêts faibles (341951=2/9, 341963=2/9, 341949=3/9) : gain estimé ~5 pts.
+```bash
+PYTHONIOENCODING=utf-8 .venv/bin/python analyze_reference.py --group identity 2>&1 | tee /workspace/saas-juridique/logs/analyze_identity_v1.log
+```
+
+4. **Pusher les commits locaux** après validation :
 ```powershell
 git push
 ```
-Commits locaux : `1f0ee30` (Phase 5) et `987633b` (Phase 6).
 
-3. **Décider du prochain objectif** : score 54% → viser 60-70% sur DPI (voir gaps ci-dessous).
-
-### Score final R-Phase 5 (2026-06-08)
+### Score R-Phase 7 Phase 2 (2026-06-08) — affiché par score_reference.py
 
 | Arrêt | Type | Score | Méta | Ident | Décis | Profil | Perséc | Docs |
 |---|---|---|---|---|---|---|---|---|
 | CCE 341946 (DPI Burundi) | DPI | 29/48 = **60%** | 6/7 85% | 5/9 55% | 4/8 50% | 12/15 80% | 1/2 50% | 1/1 100% |
-| CCE 341949 (OQT) | non-DPI | 26/48 = **54%** | 6/7 85% | 3/9 33% | 7/8 87% | 6/15 40% | 2/2 100% | 0/1 0% |
-| CCE 341951 (9bis) | non-DPI | 27/48 = **56%** | 5/7 71% | 2/9 22% | 8/8 100% | 8/15 53% | 2/2 100% | 0/1 0% |
-| CCE 341960 (DPI Guinée) | DPI | 23/48 = **47%** | 6/7 85% | 4/9 44% | 4/8 50% | 8/15 53% | 1/2 50% | 0/1 0% |
-| CCE 341962 (DPI Sénégal) | DPI | 28/48 = **58%** | 6/7 85% | 7/9 77% | 4/8 50% | 8/15 53% | 1/2 50% | 0/1 0% |
-| CCE 341963 (OQT étudiant) | non-DPI | 24/48 = **50%** | 5/7 71% | 2/9 22% | 3/8 37% | 10/15 66% | 2/2 100% | 0/1 0% |
-| RvV 342046 (DPI NL Russie) | DPI | 23/48 = **47%** | 6/7 85% | 7/11 63% | 5/9 55% | 5/13 38% | 0/1 0% | 0/1 0% |
+| CCE 341949 (OQT) | non-DPI | 26/48 = **54%** | 6/7 85% | 3/9 33% | 7/8 87% | 6/15 40% | 2/2 100% | 0/1 0%* |
+| CCE 341951 (9bis) | non-DPI | 27/48 = **56%** | 5/7 71% | 2/9 22% | 8/8 100% | 8/15 53% | 2/2 100% | 0/1 0%* |
+| CCE 341960 (DPI Guinée) | DPI | 24/48 = **50%** | 6/7 85% | 4/9 44% | 4/8 50% | 8/15 53% | 1/2 50% | 1/1 100% |
+| CCE 341962 (DPI Sénégal) | DPI | 29/48 = **60%** | 6/7 85% | 7/9 77% | 4/8 50% | 8/15 53% | 1/2 50% | 1/1 100% |
+| CCE 341963 (OQT étudiant) | non-DPI | 24/48 = **50%** | 5/7 71% | 2/9 22% | 3/8 37% | 10/15 66% | 2/2 100% | 0/1 0%* |
+| RvV 342046 (DPI NL Russie) | DPI | 24/48 = **50%** | 6/7 85% | 7/11 63% | 5/9 55% | 5/13 38% | 0/1 0% | 1/1 100% |
 | RvV 342062 (Dublin NL) | non-DPI | 29/48 = **60%** | 6/7 85% | 7/11 63% | 8/9 88% | 5/13 38% | 1/1 100% | 1/1 100% |
-| **TOTAL** | | **209/384 = 54%** | | | | | | |
+| **TOTAL** | | **212/384 = 55%** | | | | | | |
 
-Score initial (Phase 4 baseline) : 120/384 = 31% → **+23 points sur l'ensemble de la R-Phase 5**.
+\* `not_applicable` stocké en base avec `value_text="N/A"` mais non compté par `has_value()` → bug à corriger.
 
-### Gaps résiduels prioritaires (pour atteindre 60-70%)
+### Gaps résiduels prioritaires
 
 | Gap | Arrêts touchés | Impact estimé | Piste |
 |---|---|---|---|
-| COI (evidence_documents) = 0% | 341949, 341951, 341960, 341962, 341963, 342046 | ~6 pts | Section `acte_attaque` tronquée à 12000 chars — COI parfois au-delà. Augmenter ou ajouter section dédiée. |
-| identity faible | 341951 = 2/9, 341963 = 2/9, 341949 = 3/9 | ~5 pts | Sexe, ethnie, docs identité absents. Ajouter `faits_invokes` en tête de identity pour arrêts courts. |
-| profile_vulnerability NL | 342046 = 5/13, 342062 = 5/13 | ~4 pts | Critères gender-specific NL encore partiellement captured. Guidance VGV à renforcer pour les DPI. |
-| Metadata ≥ 90% | Moyenne actuelle ~82% | ~4 pts | Juge NL "wnd. voorzitter" sans nom sur certains arrêts. |
+| Bug has_value() score_reference.py | 341949, 341951, 341963 | +3 pts → 56% | `value_text=="N/A"` doit retourner True dans has_value() |
+| identity faible | 341951=2/9, 341963=2/9, 341949=3/9 | ~5 pts | Sexe, ethnie, docs identité absents → re-run identity |
+| profile_vulnerability NL | 342046=5/13 | ~4 pts | Critères gender-specific NL partiellement capturés |
+| Metadata ≥ 90% | Juge NL = "wnd. voorzitter" sans nom (342046/342062) | ~2 pts | Fallback regex juge NL |
 
-### Seuils de validation avocate (révisés)
+### Seuils de validation avocate
 
 | Critère | Seuil | Valeur actuelle | État |
 |---|---|---|---|
-| Score global | ≥ 54% | 54% | ⚠️ Seuil minimum atteint |
-| DPI (341946, 341960, 341962, 342046) | ≥ 65% | 53% moyen | ❌ |
+| Score global | ≥ 56% | 55% (212/384) | ⚠️ Proche (+3 avec bug fix) |
+| DPI (341946, 341960, 341962, 342046) | ≥ 65% | ~55% moyen | ❌ |
 | Metadata (fr/nl 001-005) | ≥ 90% | ~82% | ❌ |
 | Motivation CCE non vide sur DPI | ≥ 3/4 | 4/4 | ✅ |
 | profile_vulnerability DPI | ≥ 13/15 | 341946=12/15 | ⚠️ Proche |
 
-⚠️ **90% global est structurellement inaccessible** sans refactorisation majeure de l'extraction. Objectif révisé : 65-70% sur DPI uniquement avant soumission à l'avocate.
+### Instance Vast.ai (TOUJOURS ACTIVE)
 
-### Prochain prompt recommandé
-
-```
-Relis CLAUDE.md et PROJECT_STATE.md.
-
-R-Phase 5 terminée : score 54% (209/384). vLLM stoppé sur Vast.ai, instance à stopper manuellement.
-Commits locaux : 1f0ee30 (Phase 5) et 987633b (Phase 6) — faire git push.
-
-Objectif suivant : atteindre 65% sur les DPI. Trois gaps prioritaires :
-1. COI evidence_documents — 0% sur 6/8 arrêts. Investiguer si l'acte_attaque dépasse 12000 chars.
-2. identity — 2-3/9 sur arrêts courts. Ajouter faits_invokes en tête du groupe identity.
-3. profile_vulnerability NL — 342046 = 5/13. Renforcer guidance VGV pour DPI.
-
-Si une nouvelle session Vast.ai est nécessaire :
-- Instance : A100 PCIe 80 Go, CUDA ≥ 12.6, template PyTorch, disque ≥ 80 Go
-- commande vLLM validée (Phase 4) : voir section "Commande vLLM validée Phase 4"
-- Les commits sont maintenant pushés → faire git clone / git pull (pas de SCP nécessaire)
-
-Ne pas relancer main.py --reprocess — les intermediate_json sont à jour.
-Ne pas lancer de traitement massif (>100 arrêts) avant validation avocate.
-```
-
-### Instance Vast.ai active
-
-```
-ssh -p 18823 root@202.122.49.242 -L 8080:localhost:8080
-```
-
-- vLLM démarré (PID 4167, peut avoir quitté entre sessions — voir "Relancer vLLM" ci-dessous)
-- Fichiers R-Phase 5 déjà transférés par SCP (pas de git pull nécessaire)
-- Commits locaux non pushés sur GitHub → utiliser SCP pour transférer les nouvelles versions
+- **SSH** : `ssh -p 18823 root@202.122.49.242`
+- **GPU** : A100-SXM4-80GB, CUDA 13.1, vLLM actif (PID 8709)
+- **Repo** : `/workspace/saas-juridique` — git à `d880f77` (ancien), fichiers worker à jour via SCP
+- **⚠️ Instance facturée à l'heure — stopper sur vast.ai après la prochaine session**
 
 ### Diagnostic des gaps (pour atteindre 90%)
 
@@ -1533,16 +1608,52 @@ Résumé de la session 2026-06-07 (R-Phase 5 Phase 2) :
 - worker/analyze.py modifié :
     * _inject_regex_metadata : param arret_numero, _canonical_number depuis Supabase, _ALWAYS_INJECT
 
-Prochain objectif : R-Phase 5 Phase 3 (suite) — relancer analyze_reference.py sur les
-arrêts de référence (groupes metadata + decision_reasoning + identity), régénérer les
-fichiers audit_*_v2.txt et comparer avec RESULTAT ATTENDU.md pour valider les corrections.
+Prochain objectif : R-Phase 7 Phase 3 — corriger has_value() dans score_reference.py,
+re-run identity sur les arrêts faibles, puis viser ≥ 58% avant validation avocate.
 
 IMPORTANT :
 - Ne pas relancer main.py --reprocess — les intermediate_json existants sont à jour.
-- Les corrections de prompts.py/analyze.py s'appliquent à l'étape analyze uniquement.
-- analyze_reference.py ne filtre pas par numéro — il traite tous les arrêts de référence en base.
-- Pour un seul arrêt : python analyze.py --arret-id <uuid> --group <group> --dry-run
-- CCE 290647 toujours absent de la base — à scraper séparément.
+- Instance Vast.ai ACTIVE : ssh -p 18823 root@202.122.49.242 (vLLM PID 8709 actif).
+- Tous les fichiers worker sont à jour sur l'instance via SCP (git sur instance = d880f77, stale).
+- Les commits locaux (prompts.py + analyze.py) sont non pushés — à pusher avant la fin de session.
+- Ne pas lancer de traitement massif (>100 arrêts) avant validation avocate.
+```
+
+## Prompt de reprise R-Phase 7 Phase 3
+
+```
+Relis CLAUDE.md et PROJECT_STATE.md.
+
+R-Phase 7 Phase 2 terminée (2026-06-08) : re-run evidence_documents sur les 8 arrêts de référence.
+Score actuel : 212/384 = 55% (+3 pts). Commits locaux non pushés.
+Instance Vast.ai ACTIVE : ssh -p 18823 root@202.122.49.242 (vLLM PID 8709, A100-SXM4-80GB).
+
+Objectif Phase 3 — 3 tâches dans cet ordre :
+
+1. Corriger score_reference.py (local PC) :
+   - has_value() ne compte pas value_text="N/A" (not_applicable) comme valide
+   - Corriger dans worker/score_reference.py, SCP sur l'instance, re-scorer
+   - Gain attendu : +3 pts → 215/384 = 56%
+
+2. Re-run identity sur arrêts faibles :
+   ssh -p 18823 root@202.122.49.242
+   cd /workspace/saas-juridique/worker
+   PYTHONIOENCODING=utf-8 .venv/bin/python analyze_reference.py --group identity 2>&1 | tee /workspace/saas-juridique/logs/analyze_identity_v1.log
+   PYTHONIOENCODING=utf-8 .venv/bin/python score_reference.py --verbose
+   - Gain estimé : +3 à +5 pts → ~59-61%
+
+3. Pusher les commits locaux :
+   cd C:\Projects\saas-juridique-cce-rvv
+   git add worker/prompts.py worker/analyze.py PROJECT_STATE.md
+   git commit -m "fix(worker): R-Phase 7 Phase 2 — evidence_documents section order + cap + dédup + COI non-DPI"
+   git push
+
+IMPORTANT :
+- Instance Vast.ai toujours facturée (~2€/h) — stopper après la session si plus nécessaire.
+- Ne pas relancer main.py --reprocess.
+- vLLM toujours actif sur l'instance — vérifier avec : ssh -p 18823 root@202.122.49.242 "ps aux | grep vllm | grep -v grep"
+- Fichiers worker à jour sur instance (via SCP) : prompts.py, analyze.py, analyze_reference.py, score_reference.py.
+- Git sur l'instance est à d880f77 (stale) — toujours utiliser SCP pour transférer les fixes.
 ```
 
 ## Points de vigilance permanents
