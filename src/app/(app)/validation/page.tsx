@@ -123,9 +123,10 @@ export default async function ValidationPage({ searchParams }: PageProps) {
 
   const asileCount = allWithStats.filter((a) => ASYLUM_PROCEDURE_TYPES.has(a.procedure_type ?? "unknown")).length;
 
-  const arretsWithStats = filtre === "asile"
+  const arretsWithStats = (filtre === "asile"
     ? allWithStats.filter((a) => ASYLUM_PROCEDURE_TYPES.has(a.procedure_type ?? "unknown"))
-    : allWithStats;
+    : allWithStats
+  ).filter((a) => a.total > 0);
 
   // Stats globales sur la sélection affichée
   const totalGlobal = arretsWithStats.reduce((s, a) => s + a.total, 0);

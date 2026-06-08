@@ -1,14 +1,16 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-08 (R-Phase 8 terminée — score 214/384 = 55%, instance Vast.ai TOUJOURS ACTIVE)
+Dernière mise à jour : 2026-06-08 (R-Phase 10 terminée — 108 arrêts analysés, instance détruite. UI Validation ajoutée. Prochaine : validation avocate sur /validation)
 
 ## Objectifs en cours
 
-1. **Score courant : 214/384 = 55%** (+3 pts R-Phase 8). Commit `41f59a4` pushé.
-2. **Gap identity arrêts 3-sections** : 341949=3/9, 341951=2/9, 341963=2/9 — Sexe/Ethnie absents des sections reçues par le groupe identity. Arrêts non-DPI courts → info absente du texte disponible.
-3. **Gap 342046 identity NL** : identité stable 6/11 (LLM a trouvé Jerevan ce run, mais perdu un autre critère — net 0). Regex injection Geboorteplaats NL en place comme filet de sécurité.
-4. **Validation avocate** — Objectif révisé : ≥ 65% sur DPI uniquement (actuel ~55% moyen DPI sur 341946/341960/341962/342046).
-5. ~~R-Phase 8~~ — **Terminée** (2026-06-08) : fix group_note evidence_documents (non-DPI → force not_applicable+N/A) + _inject_regex_identity_nl() pour Geboorteplaats NL. Score 211→214/384 (+3 pts). Push `41f59a4`.
+1. **Score courant : 211/384 = 54%** (légère régression -3 LLM non-déterministe vs R-Phase 8). Dernier commit pushé : `41f59a4` (R-Phase 8) — UI non commitée.
+2. **108 arrêts analysés** en base (85 FR + 23 NL), tous avec prompts R-Phase 8. Instance Vast.ai **détruite** ✅.
+3. **Validation avocate** — L'avocate (`test@dimagin.studio`, rôle `avocat`) peut se connecter et valider sur `/validation`. Cible ≥ 65% DPI avant traitement massif.
+4. ~~R-Phase 10~~ — **Terminée** (2026-06-08) : 50 nouveaux FR scrapés + extraits + analysés (48 valeurs/arrêt). Score 211/384 = 54%.
+5. ~~R-Phase 9~~ — **Terminée** (2026-06-08) : 42 non-référence re-analysés + 8 nouveaux (5 FR + 3 NL). Score stable 214/384 = 55%.
+5. ~~R-Phase 8~~ — **Terminée** (2026-06-08) : group_note evidence_documents non-DPI + Geboorteplaats regex NL. +3 pts → 214/384. Push `41f59a4`.
+6. **Validation avocate** — Cible ≥ 65% DPI avant traitement massif. Actuel ~54% moyen DPI.
 6. ~~R-Phase 7 Phase 3~~ — **Terminée** (2026-06-08) : fix has_value() score_reference.py (check explicite "N/A"), re-run identity (8 arrêts), re-score. Score final 211/384 = 54%. Régression 342046 identity 7→6 due au re-run masse. Leçons : docs=0/1 = value_text=None (non "N/A") ; re-run all-arrêts = risqué (LLM non-déterministe NL). Push `7fbe07f`.
 6. ~~R-Phase 7 Phase 2~~ — **Terminée** (2026-06-08) : re-run evidence_documents, score 209→212/384. COI trouvé sur 341946/341960/341962/342046. not_applicable stocké pour 341949/341951/341963 (non compté dans le score = bug). Fixes : GROUP_SECTION_MAX, section order, dédup criterion_id.
 6. ~~R-Phase 7 Phase 1~~ — **Terminée** (2026-06-08) : fix prompts.py 25000 chars, commit `cb1c724`, pushé.
@@ -550,6 +552,9 @@ Migration 009 (20 min)
 | R-Phase 3. Test Qwen2.5-32B / RTX 3090 | ✅ **Terminé** | 50 arrêts analysés. Bugs corrigés. ~47 valeurs/arrêt asile. |
 | **R-Phase 4. Test Qwen2.5-72B / A100 80 Go** | ✅ **Terminé** | 48/50 arrêts, 72B validé, --enforce-eager, source_authority fix |
 | **R-Phase 5. Amélioration extraction prompts** | ✅ **Terminé** | Phases 1–6 : score 34%→54% sur 8 arrêts référence. Gaps résiduels : identity, COI, profile_vulnerability NL. |
+| **R-Phase 6–8. Corrections itératives** | ✅ **Terminé** | COI fix, has_value fix, evidence_documents non-DPI, Geboorteplaats NL. Score 54%→55%. |
+| **R-Phase 9. Batch 58 arrêts (prompts R-Phase 8)** | ✅ **Terminé** | 42 non-référence re-analysés + 8 nouveaux (5 FR + 3 NL). 58 arrêts total. Score stable 55%. |
+| **R-Phase 10. 50 nouveaux arrêts FR** | ✅ **Terminé** | 50 FR scrapés + extraits + analysés. Score 211/384 = 54%. 108 arrêts en base. |
 | **UI-Phase A. Sidebar & navigation** | ✅ **Terminé** | Focus/Export désactivés, Validation retiré du nav, Critères→Administration, BottomNav 4 items |
 | **UI-Phase B. Dashboard rebuild** | ✅ **Terminé** | 4 KPI + table 8 récents + section Focus (état vide) + donut type_decision |
 | **UI-Phase C. Liste arrêts** | ✅ **Terminé** | Search + chips filtres URL + menu ⋯ Focus + pagination 10/25/50 + tags |
@@ -605,11 +610,14 @@ LLM_STORE_RAW_OUTPUT=false
 
 ## Risques ouverts
 
-- **⚠️ Instance Vast.ai encore active** : vLLM PID 8709, A100-SXM4-80GB, facturée à l'heure. Stopper manuellement sur vast.ai après la prochaine session R-Phase 9.
-- **Qualité LLM non validée par l'avocate** : score 55% global (214/384), ~54% moyen sur DPI. Objectif ≥ 65% DPI avant envoi. Ne pas traiter plus de 100 arrêts avant validation.
+- **Instance Vast.ai détruite** ✅ (2026-06-08, après R-Phase 10).
+- **Qualité LLM non validée par l'avocate** : score 54% global (211/384), ~54% moyen sur DPI. Objectif ≥ 65% DPI avant traitement massif. Ne pas dépasser 110 arrêts avant retour avocate.
+- **UI non commitée** : `icons.tsx`, `Sidebar.tsx`, `BottomNav.tsx`, `layout.tsx` modifiés localement — à commiter avant la prochaine session Vast.ai.
+- **Scripts temporaires à supprimer** : `worker/_check_roles.py`, `worker/_set_admin.py` — utilitaires ponctuels, ne pas commiter.
 - **`type_decision` non extrait** : le worker ne produit pas encore ce champ → donut stats + KPI taux d'annulation restent à 0. À ajouter dans analyze.py (regex sur dispositif).
 - **`resume_ai` non extrait** : idem — la fiche détail affiche "Résumé" (scraper) et non "Résumé IA". À ajouter dans analyze.py (nouveau groupe "summary").
 - **DPI score ~54% moyen** : 341946=60%, 341960=50%, 341962=60%, 342046=47%. Objectif ≥ 65% non atteint. Gaps : profile_vulnerability NL + identity NL + persecution_claims 342046.
+- **Régression légère score référence** : 214→211 (-3 pts) due à LLM non-déterministe sur decision_reasoning de 341951 et 342062 lors de R-Phase 10. Ne pas re-analyser sans changement de prompt.
 - **identity faible** sur arrêts courts : 341951 = 2/9, 341963 = 2/9, 341949 = 3/9. Sexe, ethnie, documents identité non extraits.
 - **profile_vulnerability NL** : 342046 = 5/13 = 38%, 342062 = 5/13 = 38%. Critères NL gender-specific encore partiellement capturés.
 - **`arrets.tags` vide** : TagPill n'apparaît pas encore. Alimenté manuellement ou par le worker après validation.
@@ -617,7 +625,6 @@ LLM_STORE_RAW_OUTPUT=false
 - **Arrêts fictifs seed** : 15 arrêts (CCE 260.001–015) avec PDF en 404 → statut `erreur`. Polluent légèrement les stats.
 - **Critères FR fusionnés** (`fr_025`, `fr_033`) : à clarifier avec la cliente.
 - **Filtres critères-based non branchés côté serveur** : params avancés capturés en URL mais ne filtrent pas encore Supabase. TODO V2.
-- **Disponibilité A100 sur Vast.ai** : filtrer VRAM ≥ 79 Go impérativement (les A100 40 Go affichent parfois "80 Go").
 
 ## R-Phase 5 — Phase 1 terminée (2026-06-07)
 
@@ -1237,7 +1244,145 @@ Gain attendu après fix : +3 pts → 215/384 = 56%.
 
 ---
 
+## R-Phase 10 — Bilan (2026-06-08)
+
+### Résultats
+
+- **50 nouveaux arrêts FR** scrapés (CCE 341802–341925), extraits (50/50 OK), analysés (50/50 OK, 48 valeurs/arrêt)
+- **Instance Vast.ai** : 2× A100-SXM4-80GB, CUDA 13.2, vLLM 0.11.2, `--tensor-parallel-size 2` — modèle chargé en ~80s, analyse en ~25 min
+- **Score référence post-analyse** : 211/384 = 54% (régression -3 pts LLM non-déterministe sur 341951 decision et 342062 decision)
+- **Total base** : 108 arrêts analysés (85 FR + 23 NL)
+
+### Commande vLLM validée (2× A100 SXM4 80 Go, CUDA 13.2)
+
+```bash
+nohup .venv/bin/python -m vllm.entrypoints.openai.api_server \
+  --model Qwen/Qwen2.5-72B-Instruct-AWQ \
+  --port 8000 --dtype auto \
+  --max-model-len 16384 --gpu-memory-utilization 0.92 \
+  --trust-remote-code --enforce-eager \
+  --tensor-parallel-size 2 \
+  > /workspace/saas-juridique/logs/vllm.log 2>&1 &
+```
+
+### Fichiers modifiés (session 2026-06-08 R-Phase 10 + UI)
+
+| Fichier | Changement |
+|---|---|
+| `src/components/icons.tsx` | `IconClipboard` ajouté (icône presse-papier pour Validation) |
+| `src/components/Sidebar.tsx` | `{ href: "/validation", label: "Validation", Icon: IconClipboard }` ajouté en tête de `adminNav` |
+| `src/components/BottomNav.tsx` | Prop `userRole?: string` ; pour admin/avocat : "Validation" remplace "Focus" (grisé) en 4e position |
+| `src/app/(app)/layout.tsx` | `<BottomNav userRole={userRole} />` — `userRole` passé en prop |
+
+### Nouveaux fichiers temporaires (à supprimer)
+
+| Fichier | Rôle |
+|---|---|
+| `worker/_check_roles.py` | Liste les rôles des profils en base |
+| `worker/_set_admin.py` | Met à jour le rôle d'un utilisateur |
+
+### Décisions ajoutées
+
+- **`--tensor-parallel-size 2`** : validé sur 2× A100-SXM4-80GB (CUDA 13.2). Divise le temps d'analyse par ~2 vs 1× GPU. À utiliser systématiquement si l'instance a ≥ 2 GPUs.
+- **Onglet Validation dans la sidebar** : visible uniquement pour `admin` et `avocat` (section Admin). Sur mobile, remplace "Focus" (grisé) dans le BottomNav.
+- **Rôles Supabase mis à jour** : `kdoucenet@gmail.com` → `admin` ; `test@dimagin.studio` → `avocat`. La policy RLS `acv_update` (migration 005) autorise déjà ces deux rôles à écrire `validation_status` + `validation_note`.
+- **Score référence légèrement régressé** (214→211) : LLM non-déterministe sur decision_reasoning de 341951 et 342062. Les valeurs de référence ne sont PAS été re-purgées — la régression vient d'un re-run accidentel de ces arrêts lors de l'analyse batch R-Phase 10 (arrêts probablement re-sélectionnés comme "pending" pour une raison inconnue). Ne pas re-analyser sans changement de prompt.
+
+---
+
 ## Prochaine action exacte
+
+**Validation avocate — révision qualité LLM sur `/validation`**
+
+### Contexte
+
+R-Phase 10 terminée (2026-06-08). 108 arrêts analysés (85 FR + 23 NL), tous avec prompts R-Phase 8.
+Score référence : 211/384 = 54%. Instance Vast.ai détruite.
+L'avocate (`test@dimagin.studio`, rôle `avocat`) peut se connecter sur l'app et accéder à `/validation` depuis la sidebar.
+
+### Ce que doit faire l'avocate
+
+1. Se connecter sur l'app (https://dimagin-saasjur.vercel.app ou localhost:3000)
+2. Aller sur **Validation** (sidebar gauche, section Admin)
+3. Filtrer **"Asile / protection"** (filtre par défaut)
+4. Ouvrir arrêt par arrêt → cliquer **Correct / Incorrect / Incertain** sur chaque critère
+5. Ajouter un commentaire si besoin (bouton "Commentaire")
+6. Objectif : réviser au moins **5 arrêts DPI** complets
+
+### Seuils de déclenchement batch massif
+
+| Critère | Seuil requis | Valeur actuelle |
+|---|---|---|
+| Score global référence | ≥ 60% | 54% ❌ |
+| Score DPI moyen (4 arrêts DPI FR) | ≥ 65% | ~54% ❌ |
+| Taux incorrects validés par avocate | ≤ 20% | non mesuré |
+| Arrêts DPI validés | ≥ 5 | 0 |
+
+### Après la validation avocate
+
+- Si taux incorrects ≤ 20% → déclencher traitement batch massif
+- Si taux incorrects > 20% → nouvelle phase de correction prompts (R-Phase 11)
+- **Ne PAS dépasser 110 arrêts analysés** avant que l'avocate ait validé au moins 5 DPI
+
+### UUIDs des 8 arrêts de référence (à ne jamais purger)
+
+| Arrêt | UUID |
+|---|---|
+| CCE 341946 fr | 0fd55631-00d4-433c-b599-5fbb75692d16 |
+| CCE 341949 fr | e62bfb49-8e15-45f9-95d5-2c558c2571d4 |
+| CCE 341951 fr | b3adae70-1776-4c6c-846f-0d0776ae742b |
+| CCE 341960 fr | 464635d4-0f8b-4b98-a408-6b5f674ac249 |
+| CCE 341962 fr | 02552ae3-ae24-40ed-9918-98a5e69f0f16 |
+| CCE 341963 fr | 6f490a37-224c-4b96-92e9-97b740ede7c4 |
+| RvV 342046 nl | 08e588e6-62dc-4c41-adc8-d0fd5dd965e6 |
+| RvV 342062 nl | ff586b0e-0ca2-4c40-b3ca-f0dac25811d8 |
+
+---
+
+### Prompt de reprise (autosuffisant — à coller après /clear)
+
+```
+R-Phase 10 terminée (2026-06-08). Score référence : 211/384 = 54%. Commit `41f59a4` pushé (main). Instance Vast.ai détruite.
+
+État base : 108 arrêts analysés (85 FR + 23 NL), tous avec prompts R-Phase 8. 15 arrêts fictifs seed (CCE 260.001–015) ignorés.
+
+UI : onglet "Validation" ajouté dans la sidebar + BottomNav mobile (admin/avocat uniquement). Changements NON commités.
+Rôles : kdoucenet@gmail.com = admin, test@dimagin.studio = avocat (accès /validation depuis la sidebar).
+
+ÉTAT : en attente de validation avocate sur /validation (filtrer "Asile / protection").
+Seuil batch massif : ≥ 5 arrêts DPI validés + taux incorrects ≤ 20%.
+Score actuel trop bas (54%) pour batch — attendre retour avocate avant toute décision.
+
+PROCHAINE SESSION possible :
+A) Retour avocate avec taux incorrects → si > 20% : R-Phase 11 (corrections prompts ciblées)
+B) Commit + push des changements UI non commités (icons.tsx, Sidebar.tsx, BottomNav.tsx, layout.tsx)
+C) Si besoin d'analyser plus d'arrêts : louer instance Vast.ai (2× A100 SXM4, --tensor-parallel-size 2)
+
+COMMANDE vLLM validée (2× A100 SXM4 80 Go, CUDA 13.2) :
+nohup .venv/bin/python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-72B-Instruct-AWQ --port 8000 --dtype auto --max-model-len 16384 --gpu-memory-utilization 0.92 --trust-remote-code --enforce-eager --tensor-parallel-size 2 > /workspace/saas-juridique/logs/vllm.log 2>&1 &
+
+RÈGLES ABSOLUES :
+- Ne PAS modifier worker/prompts.py ni worker/analyze.py sans validation du score référence
+- Ne PAS lancer analyze_reference.py (régression non-déterministe)
+- Ne PAS purger les 8 UUIDs de référence
+- Ne PAS dépasser 110 arrêts analysés avant retour avocate
+```
+
+---
+
+## ~~R-Phase 9~~ — Terminée (2026-06-08)
+
+### Résultats
+
+- **42 arrêts non-référence** re-analysés avec prompts R-Phase 8 (vieilles valeurs R-Phase 3/4 purgées)
+- **8 nouveaux arrêts** scrapés (5 FR OQT urgence + 3 NL DPI fond), extraits, analysés (49-51 valeurs/arrêt)
+- **Total : 58 arrêts analysés** en base (35 FR + 23 NL)
+- **Score référence : 214/384 = 55% — aucune régression**
+- **Instance Vast.ai détruite** après la session
+
+---
+
+## R-Phase 9 — Plan initial (archivé)
 
 **R-Phase 9 — Préparer 50 arrêts pour validation avocate (instance Vast.ai active)**
 

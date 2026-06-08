@@ -10,6 +10,7 @@ import {
   IconArrowUpTray,
   IconChart,
   IconCheckSquare,
+  IconClipboard,
   IconSettings,
   IconLogout,
 } from "@/components/icons";
@@ -26,6 +27,7 @@ const disabledNav = [
 ];
 
 const adminNav = [
+  { href: "/validation", label: "Validation",     Icon: IconClipboard },
   { href: "/criteres",   label: "Administration", Icon: IconCheckSquare },
   { href: "/parametres", label: "Paramètres",     Icon: IconSettings },
 ];

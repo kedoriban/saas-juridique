@@ -40,7 +40,7 @@ export default async function AppLayout({
 
       {/* Bottom nav — mobile uniquement */}
       <div className="lg:hidden">
-        <BottomNav />
+        <BottomNav userRole={userRole} />
       </div>
     </div>
   );
