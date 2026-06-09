@@ -1,14 +1,14 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-09 (R-Phase 12 — batch 68 FR EN COURS sur instance 40250378. Fulltext abandonné, 7-groupes validé avec Mixtral. Batch lancé : analyze.py --limit 100, PID 5950, log /workspace/saas-juridique/logs/batch_main.log. Après batch : score → détruire instance.)
+Dernière mise à jour : 2026-06-09 (R-Phase 12 — TERMINÉE. Score stable 216/384 = 56%. 20 nouveaux FR analysés avec Mixtral 8x22B AWQ (batch limité à 20 à la demande). Instance 40250378 détruite. Prochaine : R-Phase 13 — Mistral-Large-2-AWQ sur A100 80GB + améliorations prompts validées par la cliente.)
 
 ## Objectifs en cours
 
-1. **Score courant : 216/384 = 56%** (R-Phase 11 terminée). Dernier commit : `eab41c6` (fix R-Phase 12 fulltext debug + llm_provider).
-2. **195 arrêts en base** — 127 avec valeurs LLM (104 FR / 23 NL), 68 FR sans valeurs. **Batch en cours** : ~63 FR restants à analyser.
-3. **R-Phase 12 EN COURS** : batch 7-groupes Mixtral 8x22B AWQ sur Vast.ai. Fulltext abandonné (Mixtral ignore les criterion_id). Mode 7-groupes validé : 48 valeurs/arrêt, non-null, criterion_ids corrects.
-4. **Instance Vast.ai 40250378 ACTIVE** ⚠️ — ssh8.vast.ai:10378, A100 SXM4, ~1.09 $/h. **DÉTRUIRE après score.**
-4. ~~R-Phase 11~~ — **Terminée** (2026-06-09) : 87 nouveaux FR scrapés + extraits. 105 arrêts analysés sur Vast.ai (instance 40125949, A100 SXM4, 1.20 $/h, ~10 $). Score 211→216/384 = 56% (+5 pts). 37 arrêts ont stocké des valeurs sur les 105 traités. 68 FR sans valeurs restants.
+1. **Score courant : 216/384 = 56%** (R-Phase 12 terminée, stable). Dernier commit : `daf0dbc`.
+2. **215 arrêts en base** — ~147 avec valeurs LLM, ~48 FR sans valeurs restants.
+3. **R-Phase 13 à lancer** : Mistral-Large-2-Instruct-2411-AWQ sur A100 80GB (max 3.00 $/h). Tester fulltext en premier (1 appel/arrêt au lieu de 7). Améliorations prompts validées par la cliente à appliquer.
+4. ~~R-Phase 12~~ — **Terminée** (2026-06-09) : 20 arrêts FR analysés (batch limité à 20). Score 216/384 = 56% confirmé, aucune régression. Instance 40250378 (A100 SXM4, ~1.09 $/h) détruite. Durée : ~16:21→19:10 UTC (~2h49, ~3 $). Améliorations prompts identifiées sur CCE 341854 (fr_013 genre grammatical, fr_018 mère célibataire, fr_006 date intro, fr_007 durée, fr_014 info partielle, fr_043 motivation CCE).
+5. ~~R-Phase 11~~ — **Terminée** (2026-06-09) : 87 nouveaux FR scrapés + extraits. 105 arrêts analysés sur Vast.ai (instance 40125949, A100 SXM4, 1.20 $/h, ~10 $). Score 211→216/384 = 56% (+5 pts). 37 arrêts ont stocké des valeurs sur les 105 traités. 68 FR sans valeurs restants.
 5. ~~R-Phase 10~~ — **Terminée** (2026-06-08) : 50 nouveaux FR scrapés + extraits + analysés (48 valeurs/arrêt). Score 211/384 = 54%.
 5. ~~R-Phase 9~~ — **Terminée** (2026-06-08) : 42 non-référence re-analysés + 8 nouveaux (5 FR + 3 NL). Score stable 214/384 = 55%.
 5. ~~R-Phase 8~~ — **Terminée** (2026-06-08) : group_note evidence_documents non-DPI + Geboorteplaats regex NL. +3 pts → 214/384. Push `41f59a4`.
@@ -567,7 +567,8 @@ Migration 009 (20 min)
 | **R-Phase 9. Batch 58 arrêts (prompts R-Phase 8)** | ✅ **Terminé** | 42 non-référence re-analysés + 8 nouveaux (5 FR + 3 NL). 58 arrêts total. Score stable 55%. |
 | **R-Phase 10. 50 nouveaux arrêts FR** | ✅ **Terminé** | 50 FR scrapés + extraits + analysés. Score 211/384 = 54%. 108 arrêts en base. |
 | **R-Phase 11. 105 arrêts FR batch** | ✅ **Terminé** | 87 FR scrapés + extraits + analysés. Score 211→216/384 = 56%. 195 arrêts en base. |
-| **R-Phase 12. Mixtral 8x22B AWQ — batch 7-groupes** | 🟡 **En cours** | Fulltext abandonné (criterion_id ignorés). 7-groupes validé : 48 val/arrêt. Batch --limit 100 lancé 16:21 UTC (PID 5950). ~63 FR restants. |
+| **R-Phase 12. Mixtral 8x22B AWQ — batch 7-groupes** | ✅ **Terminé** | 20 FR analysés (batch limité à 20). Score 216/384 = 56% stable. Instance 40250378 détruite (~3 $). |
+| **R-Phase 13. Mistral-Large-2 + prompts améliorés** | ⏳ **À lancer** | A100 80GB (max 3$/h), Mistral-Large-Instruct-2411-AWQ, tester fulltext d'abord. 6 améliorations prompts à appliquer (voir worker/prompts_improvements_r12.md). |
 | **UI-Phase A. Sidebar & navigation** | ✅ **Terminé** | Focus/Export désactivés, Validation retiré du nav, Critères→Administration, BottomNav 4 items |
 | **UI-Phase B. Dashboard rebuild** | ✅ **Terminé** | 4 KPI + table 8 récents + section Focus (état vide) + donut type_decision |
 | **UI-Phase C. Liste arrêts** | ✅ **Terminé** | Search + chips filtres URL + menu ⋯ Focus + pagination 10/25/50 + tags |
@@ -623,9 +624,8 @@ LLM_STORE_RAW_OUTPUT=false
 
 ## Risques ouverts
 
-- **Instance Vast.ai 40250378 ACTIVE** ⚠️ (2026-06-09, batch en cours depuis 16:21 UTC). SSH : ssh -p 10378 root@ssh8.vast.ai. ~1.09 $/h. Log : `/workspace/saas-juridique/logs/batch_main.log`. **À DÉTRUIRE après score.**
-- **68 arrêts FR sans valeurs LLM** (→ en cours d'analyse) : ~63 restants. Batch lancé, ETA ~3.5h depuis 16:21 UTC.
-- **Score 56% (216/384)** : +5 pts vs R-Phase 10. Objectif ≥ 65% DPI avant traitement massif toujours non atteint.
+- **~48 arrêts FR sans valeurs LLM** : restants après batch R-Phase 12 (limité à 20). À traiter en R-Phase 13.
+- **Score 56% (216/384)** : stable depuis R-Phase 11. Objectif ≥ 65% DPI avant traitement massif toujours non atteint.
 - **Qualité LLM non validée par l'avocate** : score 56% global, ~54% moyen sur DPI. Objectif ≥ 65% DPI avant traitement massif.
 - **UI non commitée** : `icons.tsx`, `Sidebar.tsx`, `BottomNav.tsx`, `layout.tsx` modifiés localement — à commiter avant la prochaine session Vast.ai.
 - **Scripts temporaires à supprimer** : `worker/_check_roles.py`, `worker/_set_admin.py` — utilitaires ponctuels, ne pas commiter.
