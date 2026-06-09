@@ -351,15 +351,19 @@ def fetch_arret(client, arret_id: str) -> dict | None:
     return res.data
 
 
-def fetch_pending_analyze(client, limit: int) -> list[dict]:
-    """Arrêts dont l'extraction est terminée mais l'analyse pas encore faite."""
-    res = (
+def fetch_pending_analyze(client, limit: int, lang: str | None = None) -> list[dict]:
+    """Arrêts dont l'extraction est terminée mais l'analyse pas encore faite.
+
+    lang : filtre optionnel sur la langue ('fr' ou 'nl').
+    """
+    q = (
         client.table("arrets")
         .select("id, numero, langue, pdf_url")
         .eq("statut_traitement", "termine")
-        .limit(limit * 2)  # marge : certains seront déjà analysés
-        .execute()
     )
+    if lang:
+        q = q.eq("langue", lang)
+    res = q.limit(limit * 2).execute()  # marge : certains seront déjà analysés
     arrets = res.data or []
     if not arrets:
         return []
@@ -974,6 +978,7 @@ def main() -> None:
     parser.add_argument("--arret-id",  help="UUID d'un arrêt spécifique")
     parser.add_argument("--group",     help="Analyser uniquement ce groupe LLM (ex: identity). Ignoré si --fulltext.")
     parser.add_argument("--limit",     type=int, default=3, help="Nb max d'arrêts en batch (défaut: 3)")
+    parser.add_argument("--lang",      choices=["fr", "nl"], help="Filtrer par langue (fr ou nl). Sans filtre = FR + NL mélangés.")
     parser.add_argument("--concurrency", type=int, default=1,
                         help="Nb d'arrêts traités en parallèle (défaut: 1). "
                              "Monter à 16-32 avec un serveur vLLM.")
@@ -1014,13 +1019,14 @@ def main() -> None:
                 pdf_url=arret.get("pdf_url", ""),
             )
     else:
-        arrets = fetch_pending_analyze(client, args.limit)
+        arrets = fetch_pending_analyze(client, args.limit, lang=args.lang)
         if not arrets:
-            print("Aucun arrêt prêt pour analyse (statut=termine sans valeurs).")
+            lang_info = f" (langue={args.lang})" if args.lang else ""
+            print(f"Aucun arrêt prêt pour analyse (statut=termine sans valeurs){lang_info}.")
             return
         print(f"{len(arrets)} arrêt(s) à analyser (limite={args.limit}, "
               f"concurrence={args.concurrency}, dry_run={args.dry_run}, "
-              f"fulltext={args.fulltext})")
+              f"fulltext={args.fulltext}, lang={args.lang or 'all'})")
 
         def _run_one(a: dict, task_client) -> bool:
             if args.fulltext:
