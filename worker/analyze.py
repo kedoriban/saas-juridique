@@ -35,6 +35,11 @@ from dotenv import load_dotenv
 _ENV_PATH = Path(__file__).parent.parent / ".env.local"
 load_dotenv(dotenv_path=_ENV_PATH)
 
+# Force line-buffering pour monitoring en temps réel (nohup, log files)
+# Sans ça, Python buffe stdout en mode non-interactif → log vide pendant des minutes.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)
+
 from llm_provider import get_provider, LLMResponse
 from schemas import RESPONSE_SCHEMA, PROMPT_VERSION, validate_response, normalize_response, build_schema_for_group
 from prompts import build_prompt, build_prompt_fulltext, select_sections
@@ -44,6 +49,12 @@ from build_intermediate import (
 )
 
 MAX_RETRIES = 2
+
+# Budget tokens pour le mode fulltext (1 seul appel LLM, tous les critères).
+# Configurable via LLM_FULLTEXT_MAX_TOKENS pour adapter au modèle utilisé.
+# Mistral-Large : 5500 (lent, ~12 t/s → 433s — prévoir LLM_TIMEOUT_SECONDS ≥ 450)
+# Mistral-7B    : 3500 (rapide, ~50 t/s → 70s — LLM_TIMEOUT_SECONDS=180 suffit)
+LLM_FULLTEXT_MAX_TOKENS = int(os.environ.get("LLM_FULLTEXT_MAX_TOKENS", "3500"))
 
 BOOL_TRUE  = {"oui", "true", "ja"}
 BOOL_FALSE = {"non", "false", "nee"}
@@ -870,11 +881,11 @@ def analyze_arret_fulltext(
     last_response: LLMResponse | None = None
 
     for attempt in range(MAX_RETRIES + 1):
-        # guided_json désactivé + prefilling pour Mixtral (retourne sinon 1 seul item)
-        # max_tokens=5500 : budget output fulltext > budget 7-groupes (input ~10k → ~5.5k dispo)
+        # guided_json désactivé + prefilling pour forcer la structure JSON.
+        # max_tokens via LLM_FULLTEXT_MAX_TOKENS (défaut 3500) — adapté au modèle.
         response = provider.complete(
             (system_prompt, user_prompt), json_schema=None,
-            prefill='{"items": [', max_tokens=5500,
+            prefill='{"items": [', max_tokens=LLM_FULLTEXT_MAX_TOKENS,
         )
         last_response = response
 
