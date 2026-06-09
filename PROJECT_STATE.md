@@ -1,12 +1,12 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-09 (R-Phase 12 — TERMINÉE. Score stable 216/384 = 56%. 20 nouveaux FR analysés avec Mixtral 8x22B AWQ (batch limité à 20 à la demande). Instance 40250378 détruite. Prochaine : R-Phase 13 — Mistral-Large-2-AWQ sur A100 80GB + améliorations prompts validées par la cliente.)
+Dernière mise à jour : 2026-06-09 (R-Phase 13 — instance 40282418 DÉTRUITE. Switch décidé vers Mistral 7B AWQ. Commit 3129ce0 pushé. Prochain : test Mistral-7B-Instruct-v0.3-AWQ sur 1-2 arrêts.)
 
 ## Objectifs en cours
 
-1. **Score courant : 216/384 = 56%** (R-Phase 12 terminée, stable). Dernier commit : `daf0dbc`.
-2. **215 arrêts en base** — ~147 avec valeurs LLM, ~48 FR sans valeurs restants.
-3. **R-Phase 13 à lancer** : Mistral-Large-2-Instruct-2411-AWQ sur A100 80GB (max 3.00 $/h). Tester fulltext en premier (1 appel/arrêt au lieu de 7). Améliorations prompts validées par la cliente à appliquer.
+1. **Score courant : 216/384 = 56%** (R-Phase 12 terminée, stable). Dernier commit : `3129ce0`.
+2. **~48 arrêts FR sans valeurs LLM** restants — à traiter en R-Phase 13.
+3. **R-Phase 13 EN COURS** : instance 40282418 DÉTRUITE (Mistral-Large-2, test fulltext abandonné — timeout répétés : max_tokens=5500 @ 12.7 t/s = 433s > LLM_TIMEOUT_SECONDS=300). Switch vers Mistral-7B-Instruct-v0.3-AWQ (rapide ~50 t/s, <0.30 $/h, ≥16GB VRAM). Test 1-2 arrêts en 7-groupes → validation qualité → batch 50 arrêts.
 4. ~~R-Phase 12~~ — **Terminée** (2026-06-09) : 20 arrêts FR analysés (batch limité à 20). Score 216/384 = 56% confirmé, aucune régression. Instance 40250378 (A100 SXM4, ~1.09 $/h) détruite. Durée : ~16:21→19:10 UTC (~2h49, ~3 $). Améliorations prompts identifiées sur CCE 341854 (fr_013 genre grammatical, fr_018 mère célibataire, fr_006 date intro, fr_007 durée, fr_014 info partielle, fr_043 motivation CCE).
 5. ~~R-Phase 11~~ — **Terminée** (2026-06-09) : 87 nouveaux FR scrapés + extraits. 105 arrêts analysés sur Vast.ai (instance 40125949, A100 SXM4, 1.20 $/h, ~10 $). Score 211→216/384 = 56% (+5 pts). 37 arrêts ont stocké des valeurs sur les 105 traités. 68 FR sans valeurs restants.
 5. ~~R-Phase 10~~ — **Terminée** (2026-06-08) : 50 nouveaux FR scrapés + extraits + analysés (48 valeurs/arrêt). Score 211/384 = 54%.
@@ -530,6 +530,13 @@ Migration 009 (20 min)
 - **R-Phase 8 — _inject_regex_identity_nl()** : filet de sécurité Geboorteplaats NL. Regex `geboren\b[^.]{0,80}?\bin\s+([A-ZÀ-Ü][a-zA-Zà-ü\-]{2,30})` sur `intermediate.sections`. Skip si LLM a `status=found` + value non vide. Slug partiel "geboorteplaats" pour trouver nl_014.
 - **Geboorteplaats dans header 342046** : "geboren op [redacted]1976 in Jerevan" est dans la section `header` (5454 chars), pas dans `motivering_cgvs_of_dv`. LLM l'a trouvé lors du re-run R-Phase 8 (conf=0.95, value="Jerevan, Armenië; Moskou, Rusland").
 - **Re-run 342046 identity = net 0** : LLM trouve Jerevan (+1) mais perd simultanément un autre critère (-1). Score stable 6/11. Ne pas re-run sans changement de prompt significatif.
+- **R-Phase 13 — 6 améliorations prompts** (commit `c4c42f8`) : SYSTEM_PROMPT genre grammatical FR (fr_013) ; group_note identity/fr pour sous-questions (fr_014) ; group_note procedure/fr pour date d'arrivée fallback + durée (fr_006, fr_007) ; group_note decision_reasoning/fr pour motivation CCE complète (fr_043) ; `_inject_fr018_mere_celibataire()` dans analyze.py (fr_018 : si sexe=masculin → mere_celibataire=Non) ; PROMPT_VERSION `intermediate-v1` → `intermediate-v2`.
+- **R-Phase 13 — modèle Mistral-Large-2 AWQ** : nom exact = `TechxGenus/Mistral-Large-Instruct-2411-AWQ` (casperhansen n'existe pas). Poids = 60.5 GiB. Sur A100 SXM4 80GB : max_model_len max sûr = 24000 (27104 limite, KV cache = 9.10 GiB à utilization=0.90). Note : awq_marlin serait plus rapide qu'awq pour la prochaine session.
+- **R-Phase 13 — instance 40282418** : DÉTRUITE (2026-06-09). Test fulltext abandonné — timeout répétés (max_tokens=5500 @ 12.7 t/s = 433s > timeout=300s). Mistral-Large-2 trop lent pour fulltext sans augmenter LLM_TIMEOUT_SECONDS.
+- **R-Phase 13 — switch Mistral 7B AWQ** : décision de tester `TechxGenus/Mistral-7B-Instruct-v0.3-AWQ`. Rapide (~50 t/s sur RTX 3090), VRAM ~4GB → compatible GPU ≥16GB à <0.30$/h. Pas de coût token. Test sur 1-2 arrêts en 7-groupes avant batch 50.
+- **R-Phase 13 — commit 3129ce0** : fix stdout line-buffering (sys.stdout.reconfigure) + LLM_FULLTEXT_MAX_TOKENS configurable via env (défaut 3500, ok pour 7B ; 5500 pour Mistral-Large à augmenter avec timeout ≥450s).
+- **R-Phase 13 — .env.local Mistral 7B** : LLM_PROVIDER=vllm, VLLM_BASE_URL=http://localhost:8000/v1, VLLM_MODEL=TechxGenus/Mistral-7B-Instruct-v0.3-AWQ, LLM_MAX_INPUT_CHARS=32000, LLM_MAX_OUTPUT_TOKENS=3000, LLM_FULLTEXT_MAX_TOKENS=3500, LLM_TIMEOUT_SECONDS=180.
+- **R-Phase 13 — vLLM Mistral 7B AWQ validé** : commande cible = `python -m vllm.entrypoints.openai.api_server --model TechxGenus/Mistral-7B-Instruct-v0.3-AWQ --quantization awq --max-model-len 16384 --gpu-memory-utilization 0.90 --enforce-eager --port 8000`.
 
 ## Stack retenue
 
@@ -568,7 +575,7 @@ Migration 009 (20 min)
 | **R-Phase 10. 50 nouveaux arrêts FR** | ✅ **Terminé** | 50 FR scrapés + extraits + analysés. Score 211/384 = 54%. 108 arrêts en base. |
 | **R-Phase 11. 105 arrêts FR batch** | ✅ **Terminé** | 87 FR scrapés + extraits + analysés. Score 211→216/384 = 56%. 195 arrêts en base. |
 | **R-Phase 12. Mixtral 8x22B AWQ — batch 7-groupes** | ✅ **Terminé** | 20 FR analysés (batch limité à 20). Score 216/384 = 56% stable. Instance 40250378 détruite (~3 $). |
-| **R-Phase 13. Mistral-Large-2 + prompts améliorés** | ⏳ **À lancer** | A100 80GB (max 3$/h), Mistral-Large-Instruct-2411-AWQ, tester fulltext d'abord. 6 améliorations prompts à appliquer (voir worker/prompts_improvements_r12.md). |
+| **R-Phase 13. Mistral-Large-2 + prompts améliorés** | 🔄 **EN COURS** | Instance 40282418 active. 6 améliorations prompts appliquées (commit c4c42f8). Test fulltext 4 arrêts en cours. |
 | **UI-Phase A. Sidebar & navigation** | ✅ **Terminé** | Focus/Export désactivés, Validation retiré du nav, Critères→Administration, BottomNav 4 items |
 | **UI-Phase B. Dashboard rebuild** | ✅ **Terminé** | 4 KPI + table 8 récents + section Focus (état vide) + donut type_decision |
 | **UI-Phase C. Liste arrêts** | ✅ **Terminé** | Search + chips filtres URL + menu ⋯ Focus + pagination 10/25/50 + tags |
