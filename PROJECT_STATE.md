@@ -1,12 +1,12 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-09 (R-Phase 13 — instance 40282418 DÉTRUITE. Switch décidé vers Mistral 7B AWQ. Commit 3129ce0 pushé. Prochain : test Mistral-7B-Instruct-v0.3-AWQ sur 1-2 arrêts.)
+Dernière mise à jour : 2026-06-09 (R-Phase 14 — 5 gaps decision_reasoning corrigés dans prompts.py. Commit 973527d. Prochaine étape : instance Vast.ai A100 SXM4 80Go + re-analyser 8 arrêts référence + score_reference.py → objectif > 56%.)
 
 ## Objectifs en cours
 
-1. **Score courant : 216/384 = 56%** (R-Phase 12 terminée, stable). Dernier commit : `f2c8818`.
-2. **~48 arrêts FR sans valeurs LLM** restants — à traiter en R-Phase 13.
-3. **R-Phase 13 EN COURS** : instance 40282418 DÉTRUITE. Décision finale : Mistral-Large-2 en **mode 7-groupes** (timeout = OK : ~35s/appel < 300s). Code prêt. Prochaine étape : louer A100 80 Go, tester 2 arrêts FR, valider, batch 50 FR.
+1. **Score courant : 216/384 = 56%** (R-Phase 12 terminée, stable). Dernier commit : `973527d`.
+2. **R-Phase 14 EN COURS** : 5 gaps corrigés dans `worker/prompts.py` (commit `973527d`). Instance Vast.ai détruite. **Prochaine action : louer A100 SXM4 80Go + re-analyser les 8 arrêts de référence + score_reference.py → objectif > 56%.**
+3. **R-Phase 13 TERMINÉE** : instance 40291167 (A100 SXM4, ~1.08$/h) DÉTRUITE. Mistral-Large-2 validé : 48 valeurs/arrêt, ~7-9 min/arrêt, 45-51k tokens/arrêt DPI. **5 gaps prompts identifiés** sur CCE 340332 vs référence client 340356. Corrigés en R-Phase 14.
 4. ~~R-Phase 12~~ — **Terminée** (2026-06-09) : 20 arrêts FR analysés (batch limité à 20). Score 216/384 = 56% confirmé, aucune régression. Instance 40250378 (A100 SXM4, ~1.09 $/h) détruite. Durée : ~16:21→19:10 UTC (~2h49, ~3 $). Améliorations prompts identifiées sur CCE 341854 (fr_013 genre grammatical, fr_018 mère célibataire, fr_006 date intro, fr_007 durée, fr_014 info partielle, fr_043 motivation CCE).
 5. ~~R-Phase 11~~ — **Terminée** (2026-06-09) : 87 nouveaux FR scrapés + extraits. 105 arrêts analysés sur Vast.ai (instance 40125949, A100 SXM4, 1.20 $/h, ~10 $). Score 211→216/384 = 56% (+5 pts). 37 arrêts ont stocké des valeurs sur les 105 traités. 68 FR sans valeurs restants.
 5. ~~R-Phase 10~~ — **Terminée** (2026-06-08) : 50 nouveaux FR scrapés + extraits + analysés (48 valeurs/arrêt). Score 211/384 = 54%.
@@ -541,6 +541,116 @@ Migration 009 (20 min)
 - **R-Phase 13 — .env.local Mistral-Large-2** : LLM_PROVIDER=vllm, VLLM_BASE_URL=http://localhost:8000/v1, VLLM_MODEL=TechxGenus/Mistral-Large-Instruct-2411-AWQ, LLM_MAX_INPUT_CHARS=32000, LLM_MAX_OUTPUT_TOKENS=4096, LLM_TIMEOUT_SECONDS=300.
 - **R-Phase 13 — vLLM Mistral-Large-2 sur A100 80 Go** : `python -m vllm.entrypoints.openai.api_server --model TechxGenus/Mistral-Large-Instruct-2411-AWQ --quantization awq --max-model-len 24000 --gpu-memory-utilization 0.90 --enforce-eager --port 8000`. Instance : A100 SXM4 80 Go, CUDA ≥ 12.6, template PyTorch, disque ≥ 80 Go. Téléchargement modèle : ~60 Go, ~15-20 min.
 - **R-Phase 13 — instance autonome** : Claude gère location, secrets, setup et destruction sans confirmation.
+- **R-Phase 13 — instance 40291167** : A100 SXM4 80GB, CUDA 12.8, $1.08/h. Setup : git clone + venv + pip install vllm >=0.9,<0.12 + .env.local. Téléchargement modèle : bloquer via `snapshot_download()` AVANT de lancer vLLM (vLLM se bloque en deadlock si fichiers incomplets). Modèle déjà en cache HuggingFace après première session : rechargement ~60s. DÉTRUITE après R-Phase 13.
+- **R-Phase 13 — Mistral-Large-2 vitesse réelle** : ~7-9 min/arrêt (7 groupes séquentiels). DPI long (19 pages) : ~541s, 45k+6k tok. Arrêt court (3 sections) : ~407s, 24k+5k tok. Débit : ~69 tok/s.
+- **R-Phase 13 — awq_marlin** : vLLM détecte que Mistral-Large-2 AWQ peut utiliser `awq_marlin` (plus rapide). Prochaine session : tester `--quantization awq_marlin` à la place de `awq`.
+- **R-Phase 14 — Fix 5 gaps decision_reasoning** (commit `973527d`, 2026-06-09) :
+  1. `GROUP_SECTIONS["decision_reasoning"]` : `"dispositif"`, `"dictum"` déplacés EN TÊTE (étaient en position 17/20) → fr_036 (décision finale) capturé en priorité absolue.
+  2. `group_note decision_reasoning/fr` entièrement réécrite avec 5 instructions ciblées :
+     - **fr_036** : "Chercher en PREMIER dans la section `dispositif` — C'est la DÉCISION DU CCE, pas la position du CGRA."
+     - **fr_043** : "Si le CCE annule le CGRA et accorde le statut → fr_043 doit expliquer POURQUOI le CCE accorde. Ne jamais copier la motivation CGRA."
+     - **fr_037** : "Chercher 'crédibilité' / 'crédible' dans la motivation CCE. Extraire si accordée / rejetée / partielle."
+     - **fr_040** : "2 sous-questions obligatoires : 1. Agent de persécution. 2. Agent de protection."
+     - **fr_046** : "Toujours remplir : mots-clés séparés par virgules + résumé 2-3 phrases."
+  - **RÈGLE** : seul `prompts.py` modifié. `analyze.py` non touché (règle absolue).
+  - Dry-run local CCE 340332 (Ollama qwen3:4b) lancé mais non comparatif (modèle trop petit). Validation réelle = Vast.ai uniquement.
+- **R-Phase 13 — CCE 340332 testé** : DPI burundais, 19 pages, 87k chars, statut accordé. UUID=a001b3e1-e43f-4dfa-a8b9-fd6b7333f6ee. 20/48 valeurs trouvées. Comparé au fichier référence 340356 (extraction client).
+- **R-Phase 13 — GAPS IDENTIFIÉS sur CCE 340332 (à corriger en R-Phase 14)** :
+  1. **fr_036 ABSENT (CRITIQUE)** : Dispositif ("statut accordé/refusé") jamais capturé. Ajouter section `dispositif` dans GROUP_SECTIONS["decision_reasoning"] + note "extraire la décision finale du dispositif".
+  2. **fr_043 CONFUS (CRITIQUE)** : LLM écrit "CCE rejette le recours" alors que CCE accordait le statut. LLM confond la motivation CGRA (refus) avec la décision CCE (accord). Renforcer group_note : "fr_043 = ce que le CCE DÉCIDE EN PROPRE, pas la position du CGRA".
+  3. **fr_037 ABSENT** : Crédibilité présente dans le texte ("éléments de crédibilité générale") mais non capturée. Ajouter guidance dans decision_reasoning.
+  4. **fr_040 ABSENT** : Agents de persécution présents dans le texte (rebelles/SNR) mais non extraits. Ajouter dans decision_reasoning.
+  5. **fr_046 ABSENT** : Résumé toujours vide. Ajouter un group_note spécifique dans decision_reasoning.
+  6. **fr_041 ABSENT** : Protection nationale / fuite interne non extraites.
+  7. **Multi-demandeurs** (340356) : limitation architecturale — système 1 requérant par arrêt. Arrêts couples/familles = 1 seul profil capturé. À documenter pour V2.
+- **Fichier référence client 340356** : `C:\Users\kdouc\Downloads\extraction_criteres_fr_arret_340356.md` — extraction manuelle complète par la cliente pour arrêt RvV 340356 (couple kurde irakien, 2 requérants, refus, Erbil). À utiliser comme vérité terrain pour évaluer les améliorations.
+
+## Prochaine action exacte — R-Phase 14 (suite)
+
+**Contexte :** `worker/prompts.py` corrigé (commit `973527d`). Instance Vast.ai détruite. Dry-run local non comparatif (qwen3:4b trop petit). Validation = Vast.ai uniquement.
+
+**Étape 1 — Louer instance Vast.ai A100 SXM4 80Go**
+- Filtres : VRAM ≥ 79 Go, CUDA ≥ 12.6, template PyTorch, disque ≥ 80 Go
+- Prix cible : ~1.00–1.20 $/h
+
+**Étape 2 — Setup (identique R-Phase 13)**
+```bash
+git clone https://github.com/[repo] /workspace/saas-juridique
+cd /workspace/saas-juridique/worker
+python -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/pip install "vllm>=0.9,<0.12"
+# Copier .env.local avec LLM_PROVIDER=vllm, VLLM_MODEL=TechxGenus/Mistral-Large-Instruct-2411-AWQ
+nohup python -m vllm.entrypoints.openai.api_server \
+  --model TechxGenus/Mistral-Large-Instruct-2411-AWQ \
+  --quantization awq_marlin --max-model-len 24000 \
+  --gpu-memory-utilization 0.90 --enforce-eager --port 8000 > vllm.log 2>&1 &
+```
+
+**Étape 3 — Re-analyser les 8 arrêts de référence (group decision_reasoning uniquement)**
+```bash
+# UUIDs de référence
+UUIDS=(
+  "0fd55631-00d4-433c-b599-5fbb75692d16"  # CCE 341946 fr
+  "e62bfb49-8e15-45f9-95d5-2c558c2571d4"  # CCE 341949 fr
+  "b3adae70-1776-4c6c-846f-0d0776ae742b"  # CCE 341951 fr
+  "464635d4-0f8b-4b98-a408-6b5f674ac249"  # CCE 341960 fr
+  "02552ae3-ae24-40ed-9918-98a5e69f0f16"  # CCE 341962 fr
+  "6f490a37-224c-4b96-92e9-97b740ede7c4"  # CCE 341963 fr
+  "08e588e6-62dc-4c41-adc8-d0fd5dd95e6"   # RvV 342046 nl
+  "ff586b0e-0ca2-4c40-b3ca-f0dac25811d8"  # RvV 342062 nl
+)
+for uuid in "${UUIDS[@]}"; do
+  python analyze.py --arret-id $uuid --group decision_reasoning
+done
+```
+
+**Étape 4 — Calculer le score**
+```bash
+python score_reference.py --verbose
+# Objectif : > 216/384 (> 56%)
+```
+
+**Étape 5 — Si score amélioré → batch 50 arrêts sans valeurs**
+```bash
+python analyze.py --limit 50 --lang fr
+```
+
+### Prompt de reprise recommandé (prochaine session)
+
+```
+R-Phase 14 (suite) — Re-test sur Vast.ai après fix prompts (2026-06-09).
+Score actuel : 216/384 = 56%. Commit corrigé : 973527d (worker/prompts.py).
+Instance Vast.ai : DÉTRUITE. À louer.
+
+CONTEXTE :
+- 5 gaps decision_reasoning corrigés dans prompts.py : dispositif/dictum en tête de GROUP_SECTIONS,
+  group_note enrichie (fr_036 priorité absolue, fr_043 CCE≠CGRA, fr_037 crédibilité,
+  fr_040 agents 2 sous-questions, fr_046 résumé toujours remplir).
+- Dry-run local (qwen3:4b) non comparatif — validation uniquement sur Vast.ai.
+
+PROCÉDURE :
+1. Louer A100 SXM4 80Go (même setup R-Phase 13, --quantization awq_marlin si dispo)
+2. Re-analyser les 8 arrêts de référence sur le groupe decision_reasoning uniquement
+3. python score_reference.py --verbose → objectif > 56%
+4. Si score amélioré → batch 50 arrêts FR sans valeurs (--limit 50 --lang fr)
+
+UUIDs référence :
+  CCE 341946 fr : 0fd55631-00d4-433c-b599-5fbb75692d16
+  CCE 341949 fr : e62bfb49-8e15-45f9-95d5-2c558c2571d4
+  CCE 341951 fr : b3adae70-1776-4c6c-846f-0d0776ae742b
+  CCE 341960 fr : 464635d4-0f8b-4b98-a408-6b5f674ac249
+  CCE 341962 fr : 02552ae3-ae24-40ed-9918-98a5e69f0f16
+  CCE 341963 fr : 6f490a37-224c-4b96-92e9-97b740ede7c4
+  RvV 342046 nl : 08e588e6-62dc-4c41-adc8-d0fd5dd95e6
+  RvV 342062 nl : ff586b0e-0ca2-4c40-b3ca-f0dac25811d8
+
+RÈGLES :
+- NE PAS modifier analyze.py pour les prompts
+- NE PAS re-analyser en local (Ollama trop petit)
+- NE PAS lancer batch 50 avant validation du score sur les 8 arrêts
+```
+
+---
 
 ## Stack retenue
 
@@ -579,7 +689,8 @@ Migration 009 (20 min)
 | **R-Phase 10. 50 nouveaux arrêts FR** | ✅ **Terminé** | 50 FR scrapés + extraits + analysés. Score 211/384 = 54%. 108 arrêts en base. |
 | **R-Phase 11. 105 arrêts FR batch** | ✅ **Terminé** | 87 FR scrapés + extraits + analysés. Score 211→216/384 = 56%. 195 arrêts en base. |
 | **R-Phase 12. Mixtral 8x22B AWQ — batch 7-groupes** | ✅ **Terminé** | 20 FR analysés (batch limité à 20). Score 216/384 = 56% stable. Instance 40250378 détruite (~3 $). |
-| **R-Phase 13. Mistral-Large-2 + prompts améliorés** | 🔄 **EN COURS** | Instance 40282418 active. 6 améliorations prompts appliquées (commit c4c42f8). Test fulltext 4 arrêts en cours. |
+| **R-Phase 13. Mistral-Large-2 + prompts améliorés** | ✅ **Terminée** | Instance 40291167 détruite. Mistral-Large-2 validé. 5 gaps identifiés sur CCE 340332 (fr_036/fr_043/fr_037/fr_040/fr_046). |
+| **R-Phase 14. Fix 5 gaps decision_reasoning** | 🔄 **EN COURS** | `worker/prompts.py` modifié (commit `973527d`). Dry-run local en cours. Re-test sur 8 arrêts référence à faire sur Vast.ai. |
 | **UI-Phase A. Sidebar & navigation** | ✅ **Terminé** | Focus/Export désactivés, Validation retiré du nav, Critères→Administration, BottomNav 4 items |
 | **UI-Phase B. Dashboard rebuild** | ✅ **Terminé** | 4 KPI + table 8 récents + section Focus (état vide) + donut type_decision |
 | **UI-Phase C. Liste arrêts** | ✅ **Terminé** | Search + chips filtres URL + menu ⋯ Focus + pagination 10/25/50 + tags |
@@ -635,8 +746,8 @@ LLM_STORE_RAW_OUTPUT=false
 
 ## Risques ouverts
 
-- **~48 arrêts FR sans valeurs LLM** : restants après batch R-Phase 12 (limité à 20). À traiter en R-Phase 13.
-- **Score 56% (216/384)** : stable depuis R-Phase 11. Objectif ≥ 65% DPI avant traitement massif toujours non atteint.
+- **Score 56% (216/384)** : stable depuis R-Phase 11. Objectif ≥ 65% DPI avant traitement massif toujours non atteint. R-Phase 14 vise > 56% après fix 5 gaps decision_reasoning.
+- **Instance Vast.ai à louer** : A100 SXM4 80Go requis pour re-tester les 8 arrêts référence avec les prompts R-Phase 14 corrigés.
 - **Qualité LLM non validée par l'avocate** : score 56% global, ~54% moyen sur DPI. Objectif ≥ 65% DPI avant traitement massif.
 - **UI non commitée** : `icons.tsx`, `Sidebar.tsx`, `BottomNav.tsx`, `layout.tsx` modifiés localement — à commiter avant la prochaine session Vast.ai.
 - **Scripts temporaires à supprimer** : `worker/_check_roles.py`, `worker/_set_admin.py` — utilitaires ponctuels, ne pas commiter.
