@@ -1,13 +1,13 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-09 (R-Phase 12 en cours — fulltext Mixtral 8x22B AWQ. Code implémenté + commité. Instance Vast.ai 40250378 active. 1 bug bloquant identifié : guided_json désactive les valeurs LLM sur Mixtral → fix à appliquer en 1 ligne avant de relancer les dry-runs.)
+Dernière mise à jour : 2026-06-09 (R-Phase 12 — batch 68 FR EN COURS sur instance 40250378. Fulltext abandonné, 7-groupes validé avec Mixtral. Batch lancé : analyze.py --limit 100, PID 5950, log /workspace/saas-juridique/logs/batch_main.log. Après batch : score → détruire instance.)
 
 ## Objectifs en cours
 
-1. **Score courant : 216/384 = 56%** (R-Phase 11 terminée). Dernier commit : `39f3679` (feat: R-Phase 12 fulltext).
-2. **195 arrêts en base** — 127 avec valeurs LLM (104 FR / 23 NL), 68 FR sans valeurs.
-3. **R-Phase 12 EN COURS** : fulltext Mixtral 8x22B AWQ sur Vast.ai. Code implémenté. 1 bug bloquant (guided_json) à corriger avant dry-runs.
-4. **Instance Vast.ai 40250378 ACTIVE** ⚠️ — ssh8.vast.ai:10378, A100 SXM4, ~1.09 $/h. **DÉTRUIRE dès tests terminés.**
+1. **Score courant : 216/384 = 56%** (R-Phase 11 terminée). Dernier commit : `eab41c6` (fix R-Phase 12 fulltext debug + llm_provider).
+2. **195 arrêts en base** — 127 avec valeurs LLM (104 FR / 23 NL), 68 FR sans valeurs. **Batch en cours** : ~63 FR restants à analyser.
+3. **R-Phase 12 EN COURS** : batch 7-groupes Mixtral 8x22B AWQ sur Vast.ai. Fulltext abandonné (Mixtral ignore les criterion_id). Mode 7-groupes validé : 48 valeurs/arrêt, non-null, criterion_ids corrects.
+4. **Instance Vast.ai 40250378 ACTIVE** ⚠️ — ssh8.vast.ai:10378, A100 SXM4, ~1.09 $/h. **DÉTRUIRE après score.**
 4. ~~R-Phase 11~~ — **Terminée** (2026-06-09) : 87 nouveaux FR scrapés + extraits. 105 arrêts analysés sur Vast.ai (instance 40125949, A100 SXM4, 1.20 $/h, ~10 $). Score 211→216/384 = 56% (+5 pts). 37 arrêts ont stocké des valeurs sur les 105 traités. 68 FR sans valeurs restants.
 5. ~~R-Phase 10~~ — **Terminée** (2026-06-08) : 50 nouveaux FR scrapés + extraits + analysés (48 valeurs/arrêt). Score 211/384 = 54%.
 5. ~~R-Phase 9~~ — **Terminée** (2026-06-08) : 42 non-référence re-analysés + 8 nouveaux (5 FR + 3 NL). Score stable 214/384 = 55%.
@@ -518,9 +518,12 @@ Migration 009 (20 min)
 - **342046 identity NL** : régression 7→6/11 après re-run. Geboorteplaats ("Jerevan") probablement perdu. LLM déterministe sur ce cas (même token count = même réponse). Récupérable seulement via changement de prompt.
 - **instance Vast.ai (2026-06-08)** : `ssh -p 18823 root@202.122.49.242`, A100-SXM4-80GB, vLLM PID 8709 actif, git à `d880f77` (score_reference.py à jour via SCP). **Toujours facturée.**
 - **R-Phase 12 — fulltext** : `build_prompt_fulltext()` dans prompts.py + `analyze_arret_fulltext()` + `--fulltext` dans analyze.py. Ancienne logique 7-groupes préservée intacte. Commit `39f3679`.
+- **R-Phase 12 — fulltext ABANDONNÉ** : Mixtral ignore les `criterion_id` longs (invente des noms courts) même avec prefilling + json_schema=None. Mode 7-groupes retenu à la place.
+- **R-Phase 12 — 7-groupes validé avec Mixtral** : guided_json + Mixtral → 48 valeurs/arrêt non-null, criterion_ids corrects. Batch `analyze.py --limit 100` lancé (2026-06-09 16:21 UTC). Commit `eab41c6`.
 - **Mixtral AWQ modèle validé** : `MaziyarPanahi/Mixtral-8x22B-Instruct-v0.1-AWQ` (TheBloke n'a pas de version AWQ pour ce modèle). Chargement : 68.6 GiB VRAM sur A100 SXM4 80Go. KV cache 3.8 GiB disponible pour max_model_len=16384.
-- **Mixtral chat template** : ne supporte pas le rôle `system` séparé. Fix dans `llm_provider.py` : si model contient "mixtral", merger system dans user avant d'envoyer. Script de patch : `worker/_patch_mixtral.py`.
-- **guided_json désactivé pour fulltext** : `guided_json` actif force Mixtral à retourner `value=null` pour tous les critères (seul `status` est rempli). Solution : `json_schema=None` dans `analyze_arret_fulltext()`. À commiter.
+- **Mixtral chat template** : ne supporte pas le rôle `system` séparé. Intégré nativement dans `VLLMProvider.complete()` : si model contient "mixtral", merger system dans user avant construction des messages. Plus besoin de `_patch_mixtral.py`. Commit `eab41c6`.
+- **VLLMProvider.complete() enrichi** : paramètres `prefill` (string partiel pour prefilling + `continue_final_message`/`add_generation_prompt`) et `max_tokens` (override local). Commit `eab41c6`.
+- **guided_json désactivé pour fulltext** : `guided_json` actif force Mixtral à retourner `value=null` pour tous les critères (seul `status` est rempli). Solution documentée : `json_schema=None` + prefilling dans `analyze_arret_fulltext()`. Non utilisé en pratique (fulltext abandonné).
 - **Limites contexte Mixtral 16384** : `LLM_MAX_INPUT_CHARS=28000`, `LLM_MAX_OUTPUT_TOKENS=4096` pour rester dans les 16 384 tokens totaux (input ≈ 12 000 tokens, output ≈ 3 500 tokens pour 48 critères).
 - **EngineCore zombie Vast.ai** : quand vLLM est tué avec `kill -9`, l'EngineCore (processus séparé visible avec `ps aux | grep VLLM`) peut rester vivant et tenir la VRAM. Toujours tuer explicitement le PID EngineCore avant de relancer vLLM.
 - **R-Phase 8 — group_note evidence_documents conditionnel** : `procedure_type` non-DPI → "RÈGLE ABSOLUE — not_applicable obligatoire" dans group_note (cumulé avec proc_note). `procedure_type` DPI/unknown → note COI standard inchangée.
@@ -564,7 +567,7 @@ Migration 009 (20 min)
 | **R-Phase 9. Batch 58 arrêts (prompts R-Phase 8)** | ✅ **Terminé** | 42 non-référence re-analysés + 8 nouveaux (5 FR + 3 NL). 58 arrêts total. Score stable 55%. |
 | **R-Phase 10. 50 nouveaux arrêts FR** | ✅ **Terminé** | 50 FR scrapés + extraits + analysés. Score 211/384 = 54%. 108 arrêts en base. |
 | **R-Phase 11. 105 arrêts FR batch** | ✅ **Terminé** | 87 FR scrapés + extraits + analysés. Score 211→216/384 = 56%. 195 arrêts en base. |
-| **R-Phase 12. Fulltext Mixtral 8x22B AWQ** | 🟡 **En cours** | Code implémenté (39f3679). Instance 40250378 active. Bug guided_json (values=null). Fix 1 ligne à appliquer. |
+| **R-Phase 12. Mixtral 8x22B AWQ — batch 7-groupes** | 🟡 **En cours** | Fulltext abandonné (criterion_id ignorés). 7-groupes validé : 48 val/arrêt. Batch --limit 100 lancé 16:21 UTC (PID 5950). ~63 FR restants. |
 | **UI-Phase A. Sidebar & navigation** | ✅ **Terminé** | Focus/Export désactivés, Validation retiré du nav, Critères→Administration, BottomNav 4 items |
 | **UI-Phase B. Dashboard rebuild** | ✅ **Terminé** | 4 KPI + table 8 récents + section Focus (état vide) + donut type_decision |
 | **UI-Phase C. Liste arrêts** | ✅ **Terminé** | Search + chips filtres URL + menu ⋯ Focus + pagination 10/25/50 + tags |
@@ -620,8 +623,8 @@ LLM_STORE_RAW_OUTPUT=false
 
 ## Risques ouverts
 
-- **Instance Vast.ai 40250378 ACTIVE** ⚠️ (2026-06-09, R-Phase 12 en cours). SSH : ssh -p 10378 root@ssh8.vast.ai. ~1.09 $/h. **À DÉTRUIRE dès les dry-runs terminés.**
-- **68 arrêts FR sans valeurs LLM** : extraits (statut=termine), prêts pour un prochain batch Vast.ai. check_db_state.py confirme la liste complète. Cause probable : arrêts non-DPI avec toutes sections SKIP, ou intermediate_json sans sections utiles.
+- **Instance Vast.ai 40250378 ACTIVE** ⚠️ (2026-06-09, batch en cours depuis 16:21 UTC). SSH : ssh -p 10378 root@ssh8.vast.ai. ~1.09 $/h. Log : `/workspace/saas-juridique/logs/batch_main.log`. **À DÉTRUIRE après score.**
+- **68 arrêts FR sans valeurs LLM** (→ en cours d'analyse) : ~63 restants. Batch lancé, ETA ~3.5h depuis 16:21 UTC.
 - **Score 56% (216/384)** : +5 pts vs R-Phase 10. Objectif ≥ 65% DPI avant traitement massif toujours non atteint.
 - **Qualité LLM non validée par l'avocate** : score 56% global, ~54% moyen sur DPI. Objectif ≥ 65% DPI avant traitement massif.
 - **UI non commitée** : `icons.tsx`, `Sidebar.tsx`, `BottomNav.tsx`, `layout.tsx` modifiés localement — à commiter avant la prochaine session Vast.ai.
@@ -1304,75 +1307,49 @@ nohup .venv/bin/python -m vllm.entrypoints.openai.api_server \
 
 ## Prochaine action exacte
 
-**R-Phase 12 — Fix guided_json + dry-runs 5 arrêts + score**
+**R-Phase 12 — Surveiller batch → score → détruire instance**
 
-### Contexte R-Phase 12 (2026-06-09)
+### Contexte R-Phase 12 (2026-06-09, session en cours)
 
-Code fulltext implémenté et committé (`39f3679`, main, pushé).
 Instance Vast.ai **40250378 ACTIVE** (ssh8.vast.ai:10378, A100 SXM4 80Go, ~1.09 $/h).
 vLLM PID 4261 actif : `MaziyarPanahi/Mixtral-8x22B-Instruct-v0.1-AWQ`, `max_model_len=16384`.
+Commit `eab41c6` pushé (fix llm_provider Mixtral + analyze.py + prompts.py).
 
-**Bug bloquant identifié :** `guided_json` + Mixtral → tous les `value=null` dans la réponse. Le modèle retourne les `status` mais sans aucune valeur textuelle (45/48 items trouvés mais `value=None`, `confidence=None` pour tous sauf les 5 injectés par regex).
+**Décisions prises (2026-06-09) :**
+- Fulltext mode abandonné : Mixtral ignore les `criterion_id` longs et invente des noms courts, même avec prefilling.
+- **Mode 7-groupes validé** : guided_json + Mixtral → 48 valeurs/arrêt non-null, criterion_ids corrects.
+- Batch lancé : `analyze.py --limit 100` (PID 5950 sur l'instance), log : `/workspace/saas-juridique/logs/batch_main.log`.
+- 5 arrêts test déjà analysés et stockés (2 NL + 3 FR, 35-48 valeurs).
 
-**Fix : 1 ligne dans `worker/analyze.py` (local)**
+**Améliorations `llm_provider.py` (commit `eab41c6`) :**
+- Merge Mixtral system→user intégré nativement (plus besoin de `_patch_mixtral.py`)
+- `prefill` et `max_tokens` params ajoutés à `VLLMProvider.complete()`
 
-Dans `analyze_arret_fulltext()`, trouver :
-```python
-response = provider.complete((system_prompt, user_prompt), json_schema=group_schema)
-```
-Remplacer par :
-```python
-# guided_json desactive : Mixtral ne remplit pas les valeurs avec guided_json actif
-response = provider.complete((system_prompt, user_prompt), json_schema=None)
-```
+### Séquence à reprendre
 
-Puis SCP vers l'instance ET commit local.
-
-**Patches sur l'instance (déjà appliqués) :**
-- `llm_provider.py` : Mixtral merge system→user (system role non supporté dans chat template Mixtral)
-  → Script de patch : `/tmp/_patch_mixtral.py` sur l'instance
-  → À réappliquer via SCP du script si l'instance est recréée
-- `.env.local` : `LLM_MAX_INPUT_CHARS=28000`, `LLM_MAX_OUTPUT_TOKENS=4096`, `LLM_PROVIDER=vllm`, `VLLM_MODEL=MaziyarPanahi/Mixtral-8x22B-Instruct-v0.1-AWQ`
-
-### Séquence exacte à reprendre
-
-**Étape 1 — Fix local analyze.py** (1 ligne, voir ci-dessus) + SCP
-```powershell
-cd C:\Projects\saas-juridique-cce-rvv
-# Modifier analyze.py localement (json_schema=None dans analyze_arret_fulltext)
-scp -P 10378 worker/analyze.py root@ssh8.vast.ai:/workspace/saas-juridique/worker/
-```
-
-**Étape 2 — Dry-runs sur les 5 arrêts de référence** (depuis l'instance via SSH)
+**Étape 1 — Vérifier si le batch est terminé**
 ```bash
 ssh -p 10378 root@ssh8.vast.ai
-cd /workspace/saas-juridique/worker
-PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --arret-id 0fd55631-00d4-433c-b599-5fbb75692d16 --fulltext --dry-run
-PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --arret-id 464635d4-0f8b-4b98-a408-6b5f674ac249 --fulltext --dry-run
-PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --arret-id 02552ae3-ae24-40ed-9918-98a5e69f0f16 --fulltext --dry-run
-PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --arret-id 08e588e6-62dc-4c41-adc8-d0fd5dd965e6 --fulltext --dry-run
-PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --arret-id 6f490a37-224c-4b96-92e9-97b740ede7c4 --fulltext --dry-run
+grep -c 'Stocké' /workspace/saas-juridique/logs/batch_main.log
+tail -10 /workspace/saas-juridique/logs/batch_main.log
+ps aux | grep analyze | grep -v grep
 ```
+Attendre que le process analyze.py soit terminé (~63 arrêts × ~3.5 min = ~3.5h depuis 16:21 UTC).
 
-Vérifier que `value` n'est plus null pour les critères majeurs (nationalité, motivation CCE, etc.).
-
-**Étape 3 — Si valeurs OK : run réel sans --dry-run**
-```bash
-for UUID in 0fd55631-00d4-433c-b599-5fbb75692d16 464635d4-0f8b-4b98-a408-6b5f674ac249 02552ae3-ae24-40ed-9918-98a5e69f0f16 08e588e6-62dc-4c41-adc8-d0fd5dd965e6 6f490a37-224c-4b96-92e9-97b740ede7c4; do
-  PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py --arret-id $UUID --fulltext
-done
-```
-
-**Étape 4 — Score (depuis le PC Windows)**
+**Étape 2 — Si batch terminé : score depuis le PC Windows**
 ```powershell
-cd C:\Projects\saas-juridique-cce-rvv\worker; .venv\Scripts\python.exe score_reference.py --verbose
+cd C:\Projects\saas-juridique-cce-rvv\worker
+.venv\Scripts\python.exe score_reference.py --verbose
 ```
-Objectif : dépasser 56% (216/384).
+Objectif : ne pas régresser sous 216/384 = 56%.
 
-**Étape 5 — DÉTRUIRE l'instance**
+**Étape 3 — DÉTRUIRE l'instance**
 ```powershell
-cd C:\Projects\saas-juridique-cce-rvv\worker; .venv\Scripts\vastai destroy instance 40250378
+cd C:\Projects\saas-juridique-cce-rvv\worker
+.venv\Scripts\vastai destroy instance 40250378
 ```
+
+**Étape 4 — Commit PROJECT_STATE avec bilan R-Phase 12**
 
 ### UUIDs des 8 arrêts de référence (à ne jamais purger)
 
