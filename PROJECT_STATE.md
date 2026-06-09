@@ -1,14 +1,15 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-08 (R-Phase 10 terminée — 108 arrêts analysés, instance détruite. UI Validation ajoutée. Prochaine : validation avocate sur /validation)
+Dernière mise à jour : 2026-06-09 (R-Phase 11 terminée — score 211→216/384 = 56% (+5 pts). 127 arrêts avec valeurs LLM (104 FR / 23 NL). 68 FR encore sans valeurs. Instance Vast.ai détruite ✅.)
 
 ## Objectifs en cours
 
-1. **Score courant : 211/384 = 54%** (légère régression -3 LLM non-déterministe vs R-Phase 8). Dernier commit pushé : `4bc2463` (UI Validation).
-2. **108 arrêts analysés** en base (85 FR + 23 NL), tous avec prompts R-Phase 8. Instance Vast.ai **détruite** ✅.
+1. **Score courant : 216/384 = 56%** (+5 pts vs R-Phase 10). Dernier commit pushé : `4bc2463` (UI Validation). Instance Vast.ai **détruite** ✅.
+2. **195 arrêts en base** — 127 avec valeurs LLM (104 FR / 23 NL), **68 FR sans valeurs** (extraits, à analyser dans un prochain batch Vast.ai).
 3. **Validation avocate** — L'avocate (`test@dimagin.studio`, rôle `avocat`) peut se connecter et valider sur `/validation`. Cible ≥ 65% DPI avant traitement massif.
-4. **Vast.ai autonome** : CLI dans `worker/.venv`, clé API configurée. Règle : max **2,50 $/h**, viser le moins cher. Balance ~15 $.
-4. ~~R-Phase 10~~ — **Terminée** (2026-06-08) : 50 nouveaux FR scrapés + extraits + analysés (48 valeurs/arrêt). Score 211/384 = 54%.
+4. **Vast.ai autonome** : CLI dans `worker/.venv`, clé API configurée. Règle : max **2,50 $/h**, viser le moins cher. Balance ~5 $ (R-Phase 11 a coûté ~10 $).
+4. ~~R-Phase 11~~ — **Terminée** (2026-06-09) : 87 nouveaux FR scrapés + extraits. 105 arrêts analysés sur Vast.ai (instance 40125949, A100 SXM4, 1.20 $/h, ~10 $). Score 211→216/384 = 56% (+5 pts). 37 arrêts ont stocké des valeurs sur les 105 traités. 68 FR sans valeurs restants.
+5. ~~R-Phase 10~~ — **Terminée** (2026-06-08) : 50 nouveaux FR scrapés + extraits + analysés (48 valeurs/arrêt). Score 211/384 = 54%.
 5. ~~R-Phase 9~~ — **Terminée** (2026-06-08) : 42 non-référence re-analysés + 8 nouveaux (5 FR + 3 NL). Score stable 214/384 = 55%.
 5. ~~R-Phase 8~~ — **Terminée** (2026-06-08) : group_note evidence_documents non-DPI + Geboorteplaats regex NL. +3 pts → 214/384. Push `41f59a4`.
 6. **Validation avocate** — Cible ≥ 65% DPI avant traitement massif. Actuel ~54% moyen DPI.
@@ -611,8 +612,10 @@ LLM_STORE_RAW_OUTPUT=false
 
 ## Risques ouverts
 
-- **Instance Vast.ai détruite** ✅ (2026-06-08, après R-Phase 10).
-- **Qualité LLM non validée par l'avocate** : score 54% global (211/384), ~54% moyen sur DPI. Objectif ≥ 65% DPI avant traitement massif. Ne pas dépasser 110 arrêts avant retour avocate.
+- **Instance Vast.ai détruite** ✅ (2026-06-09, après R-Phase 11).
+- **68 arrêts FR sans valeurs LLM** : extraits (statut=termine), prêts pour un prochain batch Vast.ai. check_db_state.py confirme la liste complète. Cause probable : arrêts non-DPI avec toutes sections SKIP, ou intermediate_json sans sections utiles.
+- **Score 56% (216/384)** : +5 pts vs R-Phase 10. Objectif ≥ 65% DPI avant traitement massif toujours non atteint.
+- **Qualité LLM non validée par l'avocate** : score 56% global, ~54% moyen sur DPI. Objectif ≥ 65% DPI avant traitement massif.
 - **UI non commitée** : `icons.tsx`, `Sidebar.tsx`, `BottomNav.tsx`, `layout.tsx` modifiés localement — à commiter avant la prochaine session Vast.ai.
 - **Scripts temporaires à supprimer** : `worker/_check_roles.py`, `worker/_set_admin.py` — utilitaires ponctuels, ne pas commiter.
 - **`type_decision` non extrait** : le worker ne produit pas encore ce champ → donut stats + KPI taux d'annulation restent à 0. À ajouter dans analyze.py (regex sur dispositif).
@@ -2090,6 +2093,45 @@ IMPORTANT :
   Toujours utiliser analyze.py --arret-id <uuid> --group <group> pour éviter les régressions.
 - Git sur l'instance est à d880f77 (stale) — toujours utiliser SCP pour transférer les fixes.
 - score_reference.py est à jour sur l'instance (via SCP en Phase 3).
+```
+
+## Prompt de reprise R-Phase 12
+
+```
+Relis CLAUDE.md et PROJECT_STATE.md.
+
+R-Phase 11 terminée (2026-06-09). Score 211→216/384 = 56% (+5 pts). Instance détruite.
+
+État actuel :
+- 195 arrêts en base : 127 avec valeurs LLM (104 FR / 23 NL), 68 FR sans valeurs
+- Dernier commit pushé : 4bc2463 (main)
+- Nouveau script local : worker/check_db_state.py (diagnostic base complet, non commité)
+- Balance Vast.ai : ~5 $ restants
+
+Prochaines actions possibles (dans l'ordre de priorité) :
+1. Commiter worker/check_db_state.py
+2. Investiguer les 68 arrêts sans valeurs : lancer analyze.py --limit 70 sur un batch Vast.ai
+   (ces arrêts ont statut=termine mais 0 valeurs dans arret_criteria_values)
+3. Validation avocate sur /validation (objectif ≥ 65% DPI)
+
+Commandes de référence :
+  # Diagnostic base
+  cd C:\Projects\saas-juridique-cce-rvv\worker
+  .venv\Scripts\activate
+  $env:PYTHONIOENCODING="utf-8"; python check_db_state.py
+
+  # Score référence
+  $env:PYTHONIOENCODING="utf-8"; python score_reference.py --verbose
+
+  # Louer instance Vast.ai (A100 SXM4 80 Go, max 2.50 $/h)
+  vastai search offers "gpu_ram>=79 num_gpus=1 cuda_vers>=12.6 disk_space>=80 cpu_ram>=64" --type on-demand --order dph_total --limit 5
+
+RÈGLES ABSOLUES :
+- Ne PAS modifier worker/prompts.py ni worker/analyze.py sans validation du score référence
+- Ne PAS lancer analyze_reference.py
+- Ne PAS purger les 8 UUIDs de référence
+- Vast.ai : max 2.50 $/h, détruire dès analyse terminée
+- Balance ~5 $ — attention aux coûts
 ```
 
 ## Points de vigilance permanents
