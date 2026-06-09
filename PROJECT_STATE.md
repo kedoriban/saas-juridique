@@ -1,13 +1,13 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-09 (R-Phase 11 terminée — score 211→216/384 = 56% (+5 pts). 127 arrêts avec valeurs LLM (104 FR / 23 NL). 68 FR encore sans valeurs. Instance Vast.ai détruite ✅.)
+Dernière mise à jour : 2026-06-09 (R-Phase 11 terminée — score 56%. Pivot architectural décidé : GPT-4o full text, un seul appel par arrêt, texte complet transmis. Objectif : pré-remplir les arrêts à 80-85% pour que l'avocate valide rapidement.)
 
 ## Objectifs en cours
 
-1. **Score courant : 216/384 = 56%** (+5 pts vs R-Phase 10). Dernier commit pushé : `4bc2463` (UI Validation). Instance Vast.ai **détruite** ✅.
-2. **195 arrêts en base** — 127 avec valeurs LLM (104 FR / 23 NL), **68 FR sans valeurs** (extraits, à analyser dans un prochain batch Vast.ai).
-3. **Validation avocate** — L'avocate (`test@dimagin.studio`, rôle `avocat`) peut se connecter et valider sur `/validation`. Cible ≥ 65% DPI avant traitement massif.
-4. **Vast.ai autonome** : CLI dans `worker/.venv`, clé API configurée. Règle : max **2,50 $/h**, viser le moins cher. Balance ~5 $ (R-Phase 11 a coûté ~10 $).
+1. **Score courant : 216/384 = 56%** (R-Phase 11 terminée). Dernier commit : `543c833`. Instance Vast.ai **détruite** ✅.
+2. **195 arrêts en base** — 127 avec valeurs LLM (104 FR / 23 NL), 68 FR sans valeurs.
+3. **PIVOT ARCHITECTURAL DÉCIDÉ** : Abandonner l'approche 7 groupes / sélection de sections. Passer à GPT-4o (API OpenAI) + texte complet de l'arrêt + tous les critères en un seul appel LLM. Objectif : 80-85% de précision pour que l'avocate valide rapidement au lieu de corriger.
+4. **Vast.ai autonome** : CLI dans `worker/.venv`, clé API configurée. Balance ~5 $.
 4. ~~R-Phase 11~~ — **Terminée** (2026-06-09) : 87 nouveaux FR scrapés + extraits. 105 arrêts analysés sur Vast.ai (instance 40125949, A100 SXM4, 1.20 $/h, ~10 $). Score 211→216/384 = 56% (+5 pts). 37 arrêts ont stocké des valeurs sur les 105 traités. 68 FR sans valeurs restants.
 5. ~~R-Phase 10~~ — **Terminée** (2026-06-08) : 50 nouveaux FR scrapés + extraits + analysés (48 valeurs/arrêt). Score 211/384 = 54%.
 5. ~~R-Phase 9~~ — **Terminée** (2026-06-08) : 42 non-référence re-analysés + 8 nouveaux (5 FR + 3 NL). Score stable 214/384 = 55%.
@@ -2100,38 +2100,79 @@ IMPORTANT :
 ```
 Relis CLAUDE.md et PROJECT_STATE.md.
 
-R-Phase 11 terminée (2026-06-09). Score 211→216/384 = 56% (+5 pts). Instance détruite.
+R-Phase 11 terminée (2026-06-09). Score 56%. Pivot architectural décidé.
 
-État actuel :
+━━━ CONTEXTE DU PIVOT ━━━
+Le pipeline actuel (7 groupes × sélection de sections × modèle local) plafonne à 56%
+parce qu'il cache une partie du texte au LLM selon la section choisie.
+Décision : passer à GPT-4o via API OpenAI + texte complet de l'arrêt + tous les critères
+en UN SEUL appel. Objectif : 80-85% → l'avocate valide des données pré-remplies correctement
+au lieu de corriger des données fausses.
+
+━━━ ÉTAT BASE ━━━
 - 195 arrêts en base : 127 avec valeurs LLM (104 FR / 23 NL), 68 FR sans valeurs
-- Dernier commit pushé : 4bc2463 (main)
-- Nouveau script local : worker/check_db_state.py (diagnostic base complet, non commité)
-- Balance Vast.ai : ~5 $ restants
+- Dernier commit : 543c833 (main, pushé)
+- worker/check_db_state.py : diagnostic base (commité dans 543c833)
+- worker/export_for_chatgpt.py : export prompts pour test manuel (commité)
+- Clé API OpenAI : à récupérer sur platform.openai.com et mettre dans .env.local
+- Balance Vast.ai : ~5 $ (ne pas gaspiller, le pivot réduit son usage)
 
-Prochaines actions possibles (dans l'ordre de priorité) :
-1. Commiter worker/check_db_state.py
-2. Investiguer les 68 arrêts sans valeurs : lancer analyze.py --limit 70 sur un batch Vast.ai
-   (ces arrêts ont statut=termine mais 0 valeurs dans arret_criteria_values)
-3. Validation avocate sur /validation (objectif ≥ 65% DPI)
+━━━ CE QUI DOIT ÊTRE IMPLÉMENTÉ (R-Phase 12) ━━━
 
-Commandes de référence :
-  # Diagnostic base
+ÉTAPE 1 — Ajouter OpenAIProvider dans worker/llm_provider.py
+  - Classe OpenAIProvider similaire à VLLMProvider
+  - Utilise openai.OpenAI() avec OPENAI_API_KEY depuis .env.local
+  - Paramètres : OPENAI_MODEL (défaut "gpt-4o"), temperature=0
+  - Pas de prefilling (l'API OpenAI ne le supporte pas)
+  - Variables .env.local à ajouter :
+      LLM_PROVIDER=openai
+      OPENAI_API_KEY=sk-...
+      OPENAI_MODEL=gpt-4o
+
+ÉTAPE 2 — Créer un prompt "full text" dans worker/prompts.py
+  - Nouvelle fonction build_prompt_fulltext(arret_id, language, criteria_all, full_text, procedure_type)
+  - full_text = concaténation de TOUTES les sections de l'intermediate_json dans l'ordre
+  - criteria_all = les 48 critères d'un coup (FR ou NL)
+  - Un seul appel LLM par arrêt (vs 7 actuellement)
+  - Le LLM retourne un JSON avec les 48 items en une fois
+  - Schema de sortie identique aux groupes actuels : [{criterion_id, value_boolean, value_text, confidence, status, evidence_excerpt}]
+
+ÉTAPE 3 — Adapter worker/analyze.py
+  - Nouveau flag --fulltext pour utiliser le nouveau prompt
+  - Si --fulltext : un seul appel LLM avec build_prompt_fulltext()
+  - Sinon : comportement actuel inchangé (ne pas casser l'existant)
+  - Stockage identique (store_criteria_values reste inchangé)
+
+ÉTAPE 4 — Tester sur les 8 arrêts de référence
+  python analyze_reference.py --fulltext --dry-run   # voir les valeurs extraites
+  python score_reference.py --verbose                 # comparer avec 216/384 = 56%
+  Coût estimé : ~$1.50 (GPT-4o) ou ~$0.10 (GPT-4o-mini)
+
+ÉTAPE 5 — Si score > 65% : vider les valeurs LLM existantes et relancer sur tous
+  ATTENTION : ne jamais vider les 8 arrêts de référence sans backup
+  UUIDs de référence à ne jamais supprimer :
+    341946, 341949, 341951, 341960, 341962, 341963, 342046, 342062
+
+━━━ RÈGLES ABSOLUES ━━━
+- Ne PAS modifier les prompts existants (prompts.py groupes) — créer de nouvelles fonctions
+- Ne PAS lancer analyze_reference.py sans --dry-run d'abord
+- Ne PAS purger les 8 UUIDs de référence
+- Ne PAS dépasser 20 $ de coût API OpenAI sans validation du score
+- Vast.ai : max 2.50 $/h, balance ~5 $ — à réserver pour les NL si nécessaire
+
+━━━ COMMANDES DE RÉFÉRENCE ━━━
   cd C:\Projects\saas-juridique-cce-rvv\worker
   .venv\Scripts\activate
-  $env:PYTHONIOENCODING="utf-8"; python check_db_state.py
+  $env:PYTHONIOENCODING="utf-8"
 
-  # Score référence
-  $env:PYTHONIOENCODING="utf-8"; python score_reference.py --verbose
+  # Diagnostic base
+  python check_db_state.py
 
-  # Louer instance Vast.ai (A100 SXM4 80 Go, max 2.50 $/h)
-  vastai search offers "gpu_ram>=79 num_gpus=1 cuda_vers>=12.6 disk_space>=80 cpu_ram>=64" --type on-demand --order dph_total --limit 5
+  # Score référence actuel
+  python score_reference.py --verbose
 
-RÈGLES ABSOLUES :
-- Ne PAS modifier worker/prompts.py ni worker/analyze.py sans validation du score référence
-- Ne PAS lancer analyze_reference.py
-- Ne PAS purger les 8 UUIDs de référence
-- Vast.ai : max 2.50 $/h, détruire dès analyse terminée
-- Balance ~5 $ — attention aux coûts
+  # Test full text sur un arrêt (une fois implémenté)
+  python analyze.py --arret-id <uuid-341946> --fulltext --dry-run
 ```
 
 ## Points de vigilance permanents
