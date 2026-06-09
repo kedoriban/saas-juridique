@@ -4,9 +4,9 @@ Dernière mise à jour : 2026-06-09 (R-Phase 13 — instance 40282418 DÉTRUITE.
 
 ## Objectifs en cours
 
-1. **Score courant : 216/384 = 56%** (R-Phase 12 terminée, stable). Dernier commit : `3129ce0`.
+1. **Score courant : 216/384 = 56%** (R-Phase 12 terminée, stable). Dernier commit : `f2c8818`.
 2. **~48 arrêts FR sans valeurs LLM** restants — à traiter en R-Phase 13.
-3. **R-Phase 13 EN COURS** : instance 40282418 DÉTRUITE (Mistral-Large-2, test fulltext abandonné — timeout répétés : max_tokens=5500 @ 12.7 t/s = 433s > LLM_TIMEOUT_SECONDS=300). Switch vers Mistral-7B-Instruct-v0.3-AWQ (rapide ~50 t/s, <0.30 $/h, ≥16GB VRAM). Test 1-2 arrêts en 7-groupes → validation qualité → batch 50 arrêts.
+3. **R-Phase 13 EN COURS** : instance 40282418 DÉTRUITE. Décision finale : Mistral-Large-2 en **mode 7-groupes** (timeout = OK : ~35s/appel < 300s). Code prêt. Prochaine étape : louer A100 80 Go, tester 2 arrêts FR, valider, batch 50 FR.
 4. ~~R-Phase 12~~ — **Terminée** (2026-06-09) : 20 arrêts FR analysés (batch limité à 20). Score 216/384 = 56% confirmé, aucune régression. Instance 40250378 (A100 SXM4, ~1.09 $/h) détruite. Durée : ~16:21→19:10 UTC (~2h49, ~3 $). Améliorations prompts identifiées sur CCE 341854 (fr_013 genre grammatical, fr_018 mère célibataire, fr_006 date intro, fr_007 durée, fr_014 info partielle, fr_043 motivation CCE).
 5. ~~R-Phase 11~~ — **Terminée** (2026-06-09) : 87 nouveaux FR scrapés + extraits. 105 arrêts analysés sur Vast.ai (instance 40125949, A100 SXM4, 1.20 $/h, ~10 $). Score 211→216/384 = 56% (+5 pts). 37 arrêts ont stocké des valeurs sur les 105 traités. 68 FR sans valeurs restants.
 5. ~~R-Phase 10~~ — **Terminée** (2026-06-08) : 50 nouveaux FR scrapés + extraits + analysés (48 valeurs/arrêt). Score 211/384 = 54%.
@@ -535,9 +535,12 @@ Migration 009 (20 min)
 - **R-Phase 13 — modèle Mistral-Large-2 AWQ** : nom exact = `TechxGenus/Mistral-Large-Instruct-2411-AWQ` (casperhansen n'existe pas). Poids = 60.5 GiB. Sur A100 SXM4 80GB : max_model_len max sûr = 24000 (27104 limite, KV cache = 9.10 GiB à utilization=0.90). Note : awq_marlin serait plus rapide qu'awq pour la prochaine session.
 - **R-Phase 13 — instance 40282418** : DÉTRUITE (2026-06-09). Test fulltext abandonné — timeout répétés (max_tokens=5500 @ 12.7 t/s = 433s > timeout=300s). Mistral-Large-2 trop lent pour fulltext sans augmenter LLM_TIMEOUT_SECONDS.
 - **R-Phase 13 — switch Mistral 7B AWQ** : décision de tester `TechxGenus/Mistral-7B-Instruct-v0.3-AWQ`. Rapide (~50 t/s sur RTX 3090), VRAM ~4GB → compatible GPU ≥16GB à <0.30$/h. Pas de coût token. Test sur 1-2 arrêts en 7-groupes avant batch 50.
-- **R-Phase 13 — commit 3129ce0** : fix stdout line-buffering (sys.stdout.reconfigure) + LLM_FULLTEXT_MAX_TOKENS configurable via env (défaut 3500, ok pour 7B ; 5500 pour Mistral-Large à augmenter avec timeout ≥450s).
-- **R-Phase 13 — .env.local Mistral 7B** : LLM_PROVIDER=vllm, VLLM_BASE_URL=http://localhost:8000/v1, VLLM_MODEL=TechxGenus/Mistral-7B-Instruct-v0.3-AWQ, LLM_MAX_INPUT_CHARS=32000, LLM_MAX_OUTPUT_TOKENS=3000, LLM_FULLTEXT_MAX_TOKENS=3500, LLM_TIMEOUT_SECONDS=180.
-- **R-Phase 13 — vLLM Mistral 7B AWQ validé** : commande cible = `python -m vllm.entrypoints.openai.api_server --model TechxGenus/Mistral-7B-Instruct-v0.3-AWQ --quantization awq --max-model-len 16384 --gpu-memory-utilization 0.90 --enforce-eager --port 8000`.
+- **R-Phase 13 — commit 3129ce0** : fix stdout line-buffering (sys.stdout.reconfigure) + LLM_FULLTEXT_MAX_TOKENS configurable via env (défaut 3500).
+- **R-Phase 13 — commit f2c8818** : ajout `--lang fr|nl` sur analyze.py (fetch_pending_analyze filtre par langue). Permet `python analyze.py --limit 2 --lang fr`.
+- **R-Phase 13 — décision finale modèle** : Mistral-Large-2 en 7-groupes (pas fulltext). Timeout OK : ~35s/appel de 7-groupes < 300s. Fulltext abandonné (433s > 300s timeout). Qualité maximale préservée (fr_043, fr_040 NL, critères ambigus).
+- **R-Phase 13 — .env.local Mistral-Large-2** : LLM_PROVIDER=vllm, VLLM_BASE_URL=http://localhost:8000/v1, VLLM_MODEL=TechxGenus/Mistral-Large-Instruct-2411-AWQ, LLM_MAX_INPUT_CHARS=32000, LLM_MAX_OUTPUT_TOKENS=4096, LLM_TIMEOUT_SECONDS=300.
+- **R-Phase 13 — vLLM Mistral-Large-2 sur A100 80 Go** : `python -m vllm.entrypoints.openai.api_server --model TechxGenus/Mistral-Large-Instruct-2411-AWQ --quantization awq --max-model-len 24000 --gpu-memory-utilization 0.90 --enforce-eager --port 8000`. Instance : A100 SXM4 80 Go, CUDA ≥ 12.6, template PyTorch, disque ≥ 80 Go. Téléchargement modèle : ~60 Go, ~15-20 min.
+- **R-Phase 13 — instance autonome** : Claude gère location, secrets, setup et destruction sans confirmation.
 
 ## Stack retenue
 
