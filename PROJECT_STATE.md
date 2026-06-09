@@ -451,6 +451,7 @@ Migration 009 (20 min)
 
 ## Décisions validées
 
+- **Instances Vast.ai : gestion entièrement autonome par Claude** — location, choix du GPU, copie des secrets, setup vLLM, destruction après batch. Aucune confirmation demandée à l'utilisateur.
 - Le LLM ne lit jamais directement les PDF.
 - Les PDF ne sont pas stockés durablement.
 - Le worker extrait d'abord le texte avec un outil classique.
