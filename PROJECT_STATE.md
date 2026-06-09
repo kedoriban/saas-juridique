@@ -1,6 +1,6 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-09 (R-Phase 11 terminée — score 56%. Pivot architectural décidé : GPT-4o full text, un seul appel par arrêt, texte complet transmis. Objectif : pré-remplir les arrêts à 80-85% pour que l'avocate valide rapidement.)
+Dernière mise à jour : 2026-06-09 (Pivot architectural décidé + R-Phase 12 planifiée. Full text + Mixtral 8x22B sur Vast.ai. Test sur 5 arrêts de référence. Warning UI pour critères vides. Objectif 80-85% avant validation avocate.)
 
 ## Objectifs en cours
 
@@ -2100,79 +2100,158 @@ IMPORTANT :
 ```
 Relis CLAUDE.md et PROJECT_STATE.md.
 
-R-Phase 11 terminée (2026-06-09). Score 56%. Pivot architectural décidé.
+R-Phase 11 terminée (2026-06-09). Score 56%. Pivot architectural + modèle décidé.
 
 ━━━ CONTEXTE DU PIVOT ━━━
-Le pipeline actuel (7 groupes × sélection de sections × modèle local) plafonne à 56%
-parce qu'il cache une partie du texte au LLM selon la section choisie.
-Décision : passer à GPT-4o via API OpenAI + texte complet de l'arrêt + tous les critères
-en UN SEUL appel. Objectif : 80-85% → l'avocate valide des données pré-remplies correctement
-au lieu de corriger des données fausses.
+Problème actuel : le pipeline à 7 groupes cache une partie du texte au LLM → données manquées.
+Les critères ont PRESQUE TOUJOURS une valeur dans un arrêt — s'il n'y en a pas, c'est suspect.
+Décision validée :
+  - Modèle    : Mixtral 8x22B (Apache 2.0, mistralai/Mixtral-8x22B-Instruct-v0.1, HuggingFace)
+  - Approche  : full text — UN SEUL appel LLM par arrêt, tout le texte + tous les critères
+  - Infra     : Vast.ai via CLI déjà installé dans worker/.venv, clés dans .env.local
+  - Objectif  : 80-85% de précision → l'avocate valide des données pré-remplies
 
 ━━━ ÉTAT BASE ━━━
 - 195 arrêts en base : 127 avec valeurs LLM (104 FR / 23 NL), 68 FR sans valeurs
-- Dernier commit : 543c833 (main, pushé)
-- worker/check_db_state.py : diagnostic base (commité dans 543c833)
-- worker/export_for_chatgpt.py : export prompts pour test manuel (commité)
-- Clé API OpenAI : à récupérer sur platform.openai.com et mettre dans .env.local
-- Balance Vast.ai : ~5 $ (ne pas gaspiller, le pivot réduit son usage)
+- Dernier commit : efbcebc (main, pushé)
+- worker/check_db_state.py : diagnostic base
+- worker/export_for_chatgpt.py : export prompts pour inspection manuelle
+- Vast.ai CLI : worker/.venv/Scripts/vastai (ou Scripts/vast), clé dans ~/.config/vastai/vast_api_key
+- Clé Vast.ai aussi dans .env.local → VAST_API_KEY
+- Balance Vast.ai : ~5 $, règle max 2.50 $/h
 
-━━━ CE QUI DOIT ÊTRE IMPLÉMENTÉ (R-Phase 12) ━━━
+━━━ 5 ARRÊTS DE TEST (R-Phase 12) ━━━
+Utiliser ces 5 arrêts de référence (valeurs attendues dans RESULTAT ATTENDU.md) :
+  - CCE 341946 (FR, DPI Burundi accordé)      → test critères DPI complets
+  - CCE 341960 (FR, DPI Guinée MENA refusé)   → test crédibilité + COI
+  - CCE 341962 (FR, DPI Sénégal LGBT refusé)  → test profil vulnérabilité
+  - CCE 342046 (NL, DPI Russie refusé)        → test NL
+  - CCE 341963 (FR, OQT étudiant non-DPI)     → test not_applicable non-DPI
 
-ÉTAPE 1 — Ajouter OpenAIProvider dans worker/llm_provider.py
-  - Classe OpenAIProvider similaire à VLLMProvider
-  - Utilise openai.OpenAI() avec OPENAI_API_KEY depuis .env.local
-  - Paramètres : OPENAI_MODEL (défaut "gpt-4o"), temperature=0
-  - Pas de prefilling (l'API OpenAI ne le supporte pas)
-  - Variables .env.local à ajouter :
-      LLM_PROVIDER=openai
-      OPENAI_API_KEY=sk-...
-      OPENAI_MODEL=gpt-4o
+━━━ CE QUI DOIT ÊTRE IMPLÉMENTÉ ━━━
 
-ÉTAPE 2 — Créer un prompt "full text" dans worker/prompts.py
-  - Nouvelle fonction build_prompt_fulltext(arret_id, language, criteria_all, full_text, procedure_type)
-  - full_text = concaténation de TOUTES les sections de l'intermediate_json dans l'ordre
-  - criteria_all = les 48 critères d'un coup (FR ou NL)
-  - Un seul appel LLM par arrêt (vs 7 actuellement)
-  - Le LLM retourne un JSON avec les 48 items en une fois
-  - Schema de sortie identique aux groupes actuels : [{criterion_id, value_boolean, value_text, confidence, status, evidence_excerpt}]
+ÉTAPE 1 — worker/prompts.py : nouvelle fonction build_prompt_fulltext()
+  Signature :
+    def build_prompt_fulltext(
+        arret_id: str,
+        language: str,
+        criteria_all: list[dict],   # tous les critères FR ou NL
+        intermediate: IntermediateDocument,
+        procedure_type: str = "unknown",
+    ) -> tuple[str, str]:  # (system_prompt, user_prompt)
 
-ÉTAPE 3 — Adapter worker/analyze.py
-  - Nouveau flag --fulltext pour utiliser le nouveau prompt
-  - Si --fulltext : un seul appel LLM avec build_prompt_fulltext()
-  - Sinon : comportement actuel inchangé (ne pas casser l'existant)
-  - Stockage identique (store_criteria_values reste inchangé)
+  Logique :
+    - Concaténer TOUTES les sections de intermediate dans l'ordre (section_id + texte)
+    - Inclure TOUS les critères de la langue en une seule liste numérotée
+    - System prompt : même base que SYSTEM_PROMPT existant + instruction full text
+    - User prompt : texte complet de l'arrêt + liste des N critères
+    - Output attendu : JSON {"items": [{criterion_id, status, value_boolean, value_text,
+                                        confidence, evidence_excerpt}, ...N items...]}
+    - Instruction explicite : "CHAQUE critère doit avoir une entrée, même si not_applicable
+      ou not_mentioned. Un critère sans réponse est une erreur."
 
-ÉTAPE 4 — Tester sur les 8 arrêts de référence
-  python analyze_reference.py --fulltext --dry-run   # voir les valeurs extraites
-  python score_reference.py --verbose                 # comparer avec 216/384 = 56%
-  Coût estimé : ~$1.50 (GPT-4o) ou ~$0.10 (GPT-4o-mini)
+ÉTAPE 2 — worker/analyze.py : flag --fulltext
+  - Ajouter argparse --fulltext (bool, défaut False)
+  - Si --fulltext :
+      * Charger TOUS les critères de la langue (pas par groupe)
+      * Appeler build_prompt_fulltext() → 1 seul appel LLM
+      * Parser le JSON retourné (liste de N items)
+      * store_criteria_values() identique, inchangé
+  - Sinon : comportement actuel inchangé (7 groupes)
+  - Ne PAS casser l'existant
 
-ÉTAPE 5 — Si score > 65% : vider les valeurs LLM existantes et relancer sur tous
-  ATTENTION : ne jamais vider les 8 arrêts de référence sans backup
-  UUIDs de référence à ne jamais supprimer :
-    341946, 341949, 341951, 341960, 341962, 341963, 342046, 342062
+ÉTAPE 3 — Vast.ai : louer instance + setup Mixtral 8x22B
+  Séquence depuis le PC Windows (worker/.venv activé) :
+    # Chercher instance A100 80Go
+    vastai search offers "gpu_ram>=79 num_gpus=1 cuda_vers>=12.6 disk_space>=100 cpu_ram>=64" \
+      --type on-demand --order dph_total --limit 5
+
+    # Louer la moins chère ≤ 2.50 $/h
+    vastai create instance <ID> --image pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel \
+      --disk 100 --ssh --direct
+
+    # Attendre running puis SCP les fichiers worker + .env.local
+    scp -P <PORT> worker/*.py root@<HOST>:/workspace/saas-juridique/worker/
+    scp -P <PORT> .env.local root@<HOST>:/workspace/saas-juridique/
+    scp -P <PORT> data/criteria_*.json root@<HOST>:/workspace/saas-juridique/data/
+
+    # Sur l'instance :
+    cd /workspace/saas-juridique/worker
+    python3 -m venv .venv
+    .venv/bin/pip install -r requirements.txt -q
+    .venv/bin/pip install "vllm>=0.9,<0.12" -q
+
+    # Démarrer vLLM avec Mixtral 8x22B
+    nohup .venv/bin/python -m vllm.entrypoints.openai.api_server \
+      --model mistralai/Mixtral-8x22B-Instruct-v0.1 \
+      --port 8000 --dtype auto \
+      --max-model-len 16384 --gpu-memory-utilization 0.92 \
+      --enforce-eager \
+      > /workspace/saas-juridique/logs/vllm.log 2>&1 &
+
+    # Attendre "Application startup complete" (5-10 min, modèle ~45 Go à télécharger)
+    tail -f /workspace/saas-juridique/logs/vllm.log
+
+    # Variables .env.local sur l'instance (ajouter/remplacer LLM_PROVIDER) :
+    LLM_PROVIDER=vllm
+    VLLM_BASE_URL=http://localhost:8000/v1
+    VLLM_MODEL=mistralai/Mixtral-8x22B-Instruct-v0.1
+    LLM_MAX_OUTPUT_TOKENS=8192
+    LLM_TIMEOUT_SECONDS=300
+    LLM_MAX_INPUT_CHARS=60000
+
+ÉTAPE 4 — Test dry-run sur les 5 arrêts
+  Sur l'instance, depuis /workspace/saas-juridique/worker :
+    # Analyser chaque arrêt en dry-run (vérifier les valeurs extraites)
+    PYTHONIOENCODING=utf-8 .venv/bin/python analyze.py \
+      --arret-id <uuid-341946> --fulltext --dry-run
+    # Répéter pour 341960, 341962, 342046, 341963
+
+  Depuis le PC Windows (après dry-run) :
+    python score_reference.py --verbose
+    # Objectif : dépasser 216/384 = 56%
+
+ÉTAPE 5 — Si score > 65% : stocker les valeurs
+  - Relancer sans --dry-run sur les 5 arrêts
+  - Comparer les nouvelles valeurs avec RESULTAT ATTENDU.md
+  - Décider si on relance sur tous les 195 arrêts
+
+ÉTAPE 6 — DÉTRUIRE l'instance dès le test terminé
+  vastai destroy instance <ID>   (avec confirmation 'y')
+
+━━━ RÈGLE IMPORTANTE SUR LES VALEURS MANQUANTES ━━━
+Les critères ont PRESQUE TOUJOURS une valeur dans un arrêt.
+Si un critère est vide (status=not_mentioned, aucune valeur) sur un arrêt DPI :
+  → C'est suspect, probablement une erreur d'extraction
+  → Afficher un warning discret dans l'interface /validation
+Si un arrêt entier a 0 valeur LLM stockées :
+  → Analyser la cause (intermediate_json absent ? sections vides ? erreur LLM ?)
+  → Script check_db_state.py remonte déjà ces cas dans la catégorie "no_llm"
+
+━━━ UI : WARNING CRITÈRES VIDES (à implémenter dans /validation) ━━━
+Dans src/app/(app)/validation/page.tsx ou le composant ValidationRow :
+  - Si value_boolean=null ET value_text=null ET status='not_mentioned'
+    ET procedure_type='protection_internationale_fond' (arrêt DPI)
+    → Afficher un badge orange discret "?" ou "Non trouvé" sur la ligne du critère
+  - Ne pas afficher le warning pour les not_applicable (c'est normal)
+  - Ne pas afficher le warning pour les arrêts non-DPI (la plupart sont N/A)
 
 ━━━ RÈGLES ABSOLUES ━━━
-- Ne PAS modifier les prompts existants (prompts.py groupes) — créer de nouvelles fonctions
-- Ne PAS lancer analyze_reference.py sans --dry-run d'abord
-- Ne PAS purger les 8 UUIDs de référence
-- Ne PAS dépasser 20 $ de coût API OpenAI sans validation du score
-- Vast.ai : max 2.50 $/h, balance ~5 $ — à réserver pour les NL si nécessaire
+- Ne PAS modifier les fonctions existantes dans prompts.py — AJOUTER build_prompt_fulltext()
+- Ne PAS modifier l'ancienne logique 7 groupes dans analyze.py — AJOUTER --fulltext
+- Ne PAS lancer sans --dry-run d'abord sur les arrêts de référence
+- Ne PAS purger les 8 UUIDs de référence (341946/341949/341951/341960/341962/341963/342046/342062)
+- Vast.ai : max 2.50 $/h, DÉTRUIRE l'instance dès le test terminé
 
-━━━ COMMANDES DE RÉFÉRENCE ━━━
+━━━ COMMANDES LOCALES DE RÉFÉRENCE ━━━
   cd C:\Projects\saas-juridique-cce-rvv\worker
   .venv\Scripts\activate
   $env:PYTHONIOENCODING="utf-8"
 
-  # Diagnostic base
-  python check_db_state.py
-
-  # Score référence actuel
-  python score_reference.py --verbose
-
-  # Test full text sur un arrêt (une fois implémenté)
-  python analyze.py --arret-id <uuid-341946> --fulltext --dry-run
+  python check_db_state.py          # état base
+  python score_reference.py --verbose   # score actuel (216/384 = 56%)
+  vastai search offers "gpu_ram>=79 num_gpus=1 cuda_vers>=12.6 disk_space>=100" \
+    --type on-demand --order dph_total --limit 5
 ```
 
 ## Points de vigilance permanents
