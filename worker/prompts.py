@@ -80,6 +80,8 @@ GROUP_SECTIONS: dict[str, list[str]] = {
         "faits", "identite", "arguments", "credibilite",
     ],
     "decision_reasoning": [
+        # DISPOSITIF EN PREMIER : contient la décision finale (fr_036) — court et décisif
+        "dispositif", "dictum",
         # Sections spécifiques nommées (priorité absolue — courtes et ciblées)
         "article_48_7", "artikel_48_7",
         "article_3_cedh", "artikel_3_evrm",
@@ -95,7 +97,6 @@ GROUP_SECTIONS: dict[str, list[str]] = {
         "conclusion_cgra_ou_oe", "conclusie_cgvs_of_dv",
         # Motivation CGRA (longue — arrivera tronquée mais partiellement utile)
         "motivation_cgra_ou_oe", "motivering_cgvs_of_dv",
-        "dispositif", "dictum",
         "analyse", "cadre_juridique", "credibilite", "arguments",
         # Fallback pour arrêts non-DPI (3 sections) : faits_invokes contient tout
         "faits_invokes", "feitenrelaas",
@@ -347,12 +348,28 @@ def build_prompt(
         )
     elif group == "decision_reasoning" and language == "fr":
         group_note = (
-            "\n📋 MOTIVATION CCE : Résumez le raisonnement COMPLET du CCE — décision rendue, "
-            "arguments principaux, articles de loi cités, réponse aux arguments du demandeur. "
-            "Ne pas omettre les articles cités. "
-            "Exemple : 'Le CCE rejette le recours. Il estime que la partie défenderesse a "
-            "valablement considéré l'absence de circonstances exceptionnelles au sens de l'art. 9bis, "
-            "notamment parce que le requérant ne démontre pas [...].'"
+            "\n📋 PRIORITÉ ABSOLUE — fr_036 DISPOSITIF : La décision finale du CCE (statut accordé, "
+            "recours rejeté, annulation CGRA…) figure dans la section `dispositif` de l'arrêt. "
+            "C'est la DÉCISION DU CCE, pas la position du CGRA. "
+            "Chercher en PREMIER dans la section `dispositif`. "
+            "Exemple : 'Le statut de réfugié est accordé.' ou 'Le recours est rejeté.'\n"
+            "📋 ATTENTION fr_043 — MOTIVATION CCE vs CGRA : fr_043 = la motivation du CCE en propre. "
+            "Si le CCE annule la décision CGRA et accorde le statut → fr_043 doit expliquer POURQUOI "
+            "le CCE accorde (son propre raisonnement). Ne jamais copier la motivation CGRA dans fr_043. "
+            "Exemple : 'Le CCE estime crédible le récit du requérant et accorde le statut de réfugié "
+            "au sens de l'art. 48/3 car [motif CCE].'\n"
+            "📋 fr_037 — CRÉDIBILITÉ : Chercher 'crédibilité' / 'crédible' dans la motivation CCE. "
+            "Extraire si la crédibilité du récit est accordée, rejetée, ou partielle. "
+            "Utiliser status=not_mentioned uniquement si le mot n'apparaît pas du tout.\n"
+            "📋 fr_040 — AGENTS PERSÉCUTION/PROTECTION : 2 sous-questions obligatoires : "
+            "1. Agent de persécution (qui persécute : famille, État, rebelles, groupe armé…) "
+            "2. Agent de protection (autorités locales, ONG, forces de sécurité…). "
+            "Répondre à chaque sous-question même si l'une est non mentionnée.\n"
+            "📋 fr_046 — RÉSUMÉ : Toujours remplir, même si aucun autre critère n'est disponible. "
+            "Format : mots-clés séparés par virgules + résumé 2-3 phrases. "
+            "Exemple : 'DPI, Burundi, statut réfugié accordé, art. 48/3 — Le CCE accorde le statut "
+            "de réfugié à un ressortissant burundais, estimant son récit crédible et retenant la "
+            "persécution étatique comme motif de protection.'"
         )
 
     user_prompt = f"""Langue du document : {lang_label} ({language})
