@@ -177,6 +177,14 @@ VGV (critères NL uniquement) :
 - VGV = Vrouwelijke Genitale Verminking = Mutilations Génitales Féminines (MGF en français).
 - Ce critère concerne UNIQUEMENT les mutilations génitales féminines, pas d'autres formes de persécution.
 - Si le sujet n'est pas abordé dans l'arrêt, retourner status="not_mentioned".
+
+Genre grammatical (textes FR uniquement — critère "sexe") :
+- Déduire le genre depuis les marqueurs grammaticaux si non explicitement mentionné :
+  * Pronoms : "il"/"elle", "lui", "sa"/"son"
+  * Accords adjectivaux : "requérant"/"requérante", "sportif"/"sportive", "demandeur"/"demanderesse"
+  * Formulations révélatrices : "il a une sœur", "père de famille", "il est parti", "sportif de haut niveau"
+- Utiliser status="inferred" si déduit (pas mentionné explicitement).
+- Exemple : status="inferred", value="Masculin", evidence_excerpt="sportif de haut niveau, il a une sœur supplémentaire"
 """
 
 
@@ -231,6 +239,7 @@ def build_prompt(
     criteria: list[dict],    # [{id, label, type}, ...]
     sections: list[SectionEntry],
     procedure_type: str = "unknown",
+    arret_date: str | None = None,
 ) -> tuple[str, str]:
     """
     Construit le prompt pour un groupe de critères à partir de sections ciblées.
@@ -297,7 +306,7 @@ def build_prompt(
         "status":            "not_mentioned",
     }, ensure_ascii=False)
 
-    # Note pour evidence_documents : concision COI (DPI) ou not_applicable forcé (non-DPI)
+    # Notes spécifiques par groupe
     group_note = ""
     if group == "evidence_documents":
         if procedure_type not in ("protection_internationale_fond", "unknown"):
@@ -315,6 +324,36 @@ def build_prompt(
                 "\n⚠️ COI : pour chaque rapport cité, retourne le titre et l'auteur uniquement "
                 "(max 200 chars par 'value'). Ne reproduis PAS le contenu des rapports."
             )
+    elif group == "identity" and language == "fr":
+        group_note = (
+            "\n📋 SOUS-QUESTIONS : Pour les critères contenant plusieurs sous-questions "
+            "(ex. région/ville de naissance ET lieu de vie actuel), répondre explicitement à "
+            "CHAQUE sous-question. Si une sous-question est absente du texte, écrire explicitement "
+            "'non mentionné(e)'. Ne pas omettre de sous-question. "
+            "Exemple : '1. Région/ville de naissance : non mentionnée. "
+            "2. Lieu de vie : Belgique (ville non précisée).'"
+        )
+    elif group == "procedure" and language == "fr":
+        date_ctx = f" La date de l'arrêt est : {arret_date}." if arret_date else ""
+        group_note = (
+            "\n📋 DATE D'ARRIVÉE : Si la date d'arrivée en Belgique n'est pas mentionnée, "
+            "utiliser la date d'introduction de la requête devant le CCE comme valeur de repli. "
+            "Préciser la nature de chaque date. "
+            "Exemple : 'Date d'arrivée : non mentionnée. "
+            "Date d'introduction requête CCE : 20/03/2025 → valeur retenue : 20/03/2025.'"
+            + (f"\n📋 DURÉE PROCÉDURE :{date_ctx} Calculez la durée entre la date d'introduction "
+               "et la date de l'arrêt. Exprimez en jours ET en mois approximatifs. "
+               "Exemple : '20/03/2025 → 25/02/2026 = 342 jours, environ 11 mois.'")
+        )
+    elif group == "decision_reasoning" and language == "fr":
+        group_note = (
+            "\n📋 MOTIVATION CCE : Résumez le raisonnement COMPLET du CCE — décision rendue, "
+            "arguments principaux, articles de loi cités, réponse aux arguments du demandeur. "
+            "Ne pas omettre les articles cités. "
+            "Exemple : 'Le CCE rejette le recours. Il estime que la partie défenderesse a "
+            "valablement considéré l'absence de circonstances exceptionnelles au sens de l'art. 9bis, "
+            "notamment parce que le requérant ne démontre pas [...].'"
+        )
 
     user_prompt = f"""Langue du document : {lang_label} ({language})
 Groupe de critères : {group}

@@ -242,6 +242,77 @@ def _inject_regex_identity_nl(
     return result
 
 
+# ---------------------------------------------------------------------------
+# Post-traitement fr_018 — mère célibataire depuis le genre (fr_013)
+# ---------------------------------------------------------------------------
+
+_SEXE_SLUG_PART = "sexe"
+_MERE_SLUG_PART = "mere_celibataire"
+
+
+def _inject_fr018_mere_celibataire(
+    items: list[dict],
+    criteria: list[dict],
+) -> list[dict]:
+    """
+    Règle post-traitement : si fr_013 (sexe) indique clairement masculin,
+    forcer fr_018 (mère célibataire) à "Non" (sauf si déjà trouvé explicitement).
+    Équivalent des injections regex metadata_detected.
+    """
+    sexe_crit = next(
+        (c for c in criteria if _SEXE_SLUG_PART in (c.get("slug") or "")
+         and "mere" not in (c.get("slug") or "")),
+        None,
+    )
+    mere_crit = next(
+        (c for c in criteria if _MERE_SLUG_PART in (c.get("slug") or "")),
+        None,
+    )
+    if not sexe_crit or not mere_crit:
+        return items
+
+    items_by_id = {item["criterion_id"]: item for item in items}
+    sexe_item = items_by_id.get(sexe_crit["id"])
+    if not sexe_item or sexe_item.get("status") not in ("found", "inferred"):
+        return items
+
+    sexe_val = (sexe_item.get("value") or "").lower()
+    is_male = any(w in sexe_val for w in ("masculin", "homme", "male", " m ", "man"))
+    is_female = any(w in sexe_val for w in ("féminin", "feminin", "femme", "female", "vrouw"))
+    if not is_male or is_female:
+        return items
+
+    mere_id = mere_crit["id"]
+    existing = items_by_id.get(mere_id)
+    if existing and existing.get("status") == "found" and existing.get("value"):
+        return items  # LLM a une réponse explicite → ne pas écraser
+
+    items_by_id[mere_id] = {
+        "criterion_id":        mere_id,
+        "value":               "Non",
+        "confidence":          0.95,
+        "evidence_excerpt":    None,
+        "source_authority":    None,
+        "source_section":      None,
+        "needs_human_review":  False,
+        "status":              "inferred",
+        "expected_value_type": mere_crit.get("expected_value_type"),
+    }
+    print("    [POST] fr_018 mère célibataire → 'Non' (déduit genre masculin fr_013)")
+
+    result: list[dict] = []
+    seen: set[str] = set()
+    for c in criteria:
+        cid = c["id"]
+        if cid in items_by_id:
+            result.append(items_by_id[cid])
+            seen.add(cid)
+    for item in items:
+        if item.get("criterion_id") not in seen:
+            result.append(item)
+    return result
+
+
 _INTERMEDIATE_DIR = Path(__file__).parent.parent / ".tmp" / "intermediate"
 
 
@@ -571,6 +642,7 @@ def analyze_group(
         criteria=[{"id": c["id"], "label": c["label_original"], "type": c["expected_value_type"]} for c in criteria],
         sections=sections,
         procedure_type=intermediate.document.procedure_type,
+        arret_date=intermediate.document.decision_date,
     )
     prompt = (system_prompt, user_prompt)
 
@@ -705,6 +777,10 @@ def analyze_arret(
     total_completion_tokens = sum(r.completion_tokens or 0 for r in all_responses) or None
     print(f"  Total : {len(all_items)} valeurs extraites en {total_duration_ms}ms"
           + (f" | tokens: {total_prompt_tokens}+{total_completion_tokens}" if total_prompt_tokens else ""))
+
+    # Post-traitement : si sexe = masculin, forcer mère célibataire = Non
+    if language == "fr" and not target_group:
+        all_items = _inject_fr018_mere_celibataire(all_items, criteria_all)
 
     if dry_run:
         print("  → dry-run, rien stocké.")
@@ -842,6 +918,8 @@ def analyze_arret_fulltext(
     if language == "nl":
         identity_criteria = [c for c in criteria_all if c.get("llm_group") == "identity"]
         items = _inject_regex_identity_nl(items, identity_criteria, intermediate)
+    if language == "fr":
+        items = _inject_fr018_mere_celibataire(items, criteria_all)
 
     if dry_run:
         print("  → dry-run, rien stocké.")

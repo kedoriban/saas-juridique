@@ -19,7 +19,7 @@ from typing import Any
 
 import jsonschema
 
-PROMPT_VERSION = "intermediate-v1"
+PROMPT_VERSION = "intermediate-v2"
 
 # Schéma JSON attendu en sortie du LLM
 RESPONSE_SCHEMA: dict[str, Any] = {
