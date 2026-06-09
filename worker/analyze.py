@@ -794,7 +794,12 @@ def analyze_arret_fulltext(
     last_response: LLMResponse | None = None
 
     for attempt in range(MAX_RETRIES + 1):
-        response = provider.complete((system_prompt, user_prompt), json_schema=group_schema)
+        # guided_json désactivé + prefilling pour Mixtral (retourne sinon 1 seul item)
+        # max_tokens=5500 : budget output fulltext > budget 7-groupes (input ~10k → ~5.5k dispo)
+        response = provider.complete(
+            (system_prompt, user_prompt), json_schema=None,
+            prefill='{"items": [', max_tokens=5500,
+        )
         last_response = response
 
         if response.error and not response.parsed:

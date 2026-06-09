@@ -410,25 +410,25 @@ def build_prompt_fulltext(
     n = len(criteria_all)
 
     ex_found = json.dumps({
-        "criterion_id":       criteria_all[0]["id"] if criteria_all else "id_exemple",
-        "value":              "exemple de valeur extraite",
-        "confidence":         0.85,
-        "evidence_excerpt":   "citation courte copiée du texte (max 150 car.)",
-        "source_authority":   "CCE",
-        "source_section":     "article_48_7",
+        "criterion_id": criteria_all[0]["id"] if criteria_all else "id_exemple",
+        "value": "valeur extraite",
+        "confidence": 0.85,
+        "evidence_excerpt": "extrait court (max 60 car.)",
+        "source_authority": "CCE",
+        "source_section": "motivation",
         "needs_human_review": False,
-        "status":             "found",
+        "status": "found",
     }, ensure_ascii=False)
 
     ex_absent = json.dumps({
-        "criterion_id":       criteria_all[-1]["id"] if len(criteria_all) > 1 else "id_exemple_2",
-        "value":              None,
-        "confidence":         None,
-        "evidence_excerpt":   None,
-        "source_authority":   None,
-        "source_section":     None,
+        "criterion_id": criteria_all[-1]["id"] if len(criteria_all) > 1 else "id_exemple_2",
+        "value": None,
+        "confidence": None,
+        "evidence_excerpt": None,
+        "source_authority": None,
+        "source_section": None,
         "needs_human_review": False,
-        "status":             "not_mentioned",
+        "status": "not_mentioned",
     }, ensure_ascii=False)
 
     user_prompt = f"""Langue du document : {lang_label} ({language})
@@ -446,19 +446,14 @@ Tu dois utiliser UNIQUEMENT ces criterion_id exacts (copie mot pour mot) :
 
 ⚠️ RÈGLE ABSOLUE : Chaque critère DOIT avoir une entrée dans "items", même si not_applicable \
 ou not_mentioned.
-Un critère sans réponse est une ERREUR. Les critères ont PRESQUE TOUJOURS une valeur dans un arrêt.
-Si un critère semble absent, vérifie à nouveau dans TOUT le texte avant de mettre not_mentioned.
+Un critère sans réponse est une ERREUR. Produis EXACTEMENT {n} items, un par criterion_id.
 
-## FORMAT DE RÉPONSE (JSON strict)
+## FORMAT DE RÉPONSE (JSON compact, une ligne par item)
+⚠️ evidence_excerpt : MAXIMUM 60 caractères (tronque si plus long).
 Réponds avec UNIQUEMENT ce JSON — aucun texte avant ou après :
-{{
-  "items": [
-    {ex_found},
-    {ex_absent}
-  ]
-}}
+{{"items": [{ex_found}, {ex_absent}]}}
 
-Produis exactement {n} items dans "items", un par criterion_id listé ci-dessus, dans l'ordre.
+Produis exactement {n} items dans "items", dans l'ordre des criterion_id listés.
 Commence ta réponse par {{ :"""
 
     return SYSTEM_PROMPT, user_prompt

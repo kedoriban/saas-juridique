@@ -262,6 +262,8 @@ class VLLMProvider(LLMProvider):
         self,
         prompt: str | tuple[str, str],
         json_schema: dict[str, Any] | None = None,
+        prefill: str | None = None,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         if isinstance(prompt, tuple):
             system_prompt, user_prompt = prompt
@@ -271,23 +273,33 @@ class VLLMProvider(LLMProvider):
         if len(user_prompt) > self.max_input_chars:
             user_prompt = user_prompt[: self.max_input_chars]
 
+        # Mixtral ne supporte pas le rôle system séparé → fusionner dans user
+        is_mixtral = "mixtral" in self.model.lower()
+        if is_mixtral and system_prompt:
+            user_prompt = system_prompt + "\n\n" + user_prompt
+            system_prompt = ""
+
         messages: list[dict[str, str]] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": user_prompt})
-        # Note: pas de prefilling assistant ici — conflit avec guided_json sur vLLM.
-        # guided_json seul suffit à contraindre la structure JSON de sortie.
 
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
             "temperature": 0.0,
-            "max_tokens": self.max_output_tokens,
+            "max_tokens": max_tokens if max_tokens is not None else self.max_output_tokens,
             "stream": False,
         }
         # guided_json : extension vLLM qui force une sortie conforme au schéma
         if json_schema is not None:
             payload["guided_json"] = json_schema
+        # prefilling : force le modèle à continuer depuis un début de réponse partiel
+        # continue_final_message=True exige add_generation_prompt=False (sinon 400 vLLM)
+        if prefill is not None:
+            messages.append({"role": "assistant", "content": prefill})
+            payload["continue_final_message"] = True
+            payload["add_generation_prompt"] = False
 
         headers = {"Content-Type": "application/json"}
         if self.api_key:
@@ -334,11 +346,14 @@ class VLLMProvider(LLMProvider):
         prompt_tokens = usage.get("prompt_tokens")
         completion_tokens = usage.get("completion_tokens")
 
+        # Avec prefilling, le modèle continue depuis le prefill → reconstituer le JSON complet
+        parse_text = (prefill + raw_text) if prefill else raw_text
+
         # guided_json garantit normalement un JSON valide ; fallback robuste sinon
-        parsed = _try_parse(raw_text)
+        parsed = _try_parse(parse_text)
         error = None
         if parsed is None:
-            parsed, error = _extract_json(raw_text)
+            parsed, error = _extract_json(parse_text)
         return LLMResponse(
             raw_text=raw_text,
             parsed=parsed,
