@@ -37,7 +37,7 @@ load_dotenv(dotenv_path=_ENV_PATH)
 
 from llm_provider import get_provider, LLMResponse
 from schemas import RESPONSE_SCHEMA, PROMPT_VERSION, validate_response, normalize_response, build_schema_for_group
-from prompts import build_prompt, select_sections
+from prompts import build_prompt, build_prompt_fulltext, select_sections
 from build_intermediate import (
     IntermediateDocument, DocumentInfo, ExtractionQuality,
     MetadataDetected, ApplicantsDetection, SectionEntry,
@@ -740,18 +740,153 @@ def analyze_arret(
 
 
 # ---------------------------------------------------------------------------
+# R-Phase 12 — Analyse fulltext (1 appel LLM, tout le texte, tous les critères)
+# ---------------------------------------------------------------------------
+
+def analyze_arret_fulltext(
+    arret_id: str,
+    numero: str,
+    language: str,
+    client,
+    provider,
+    dry_run: bool,
+    pdf_url: str = "",
+) -> bool:
+    """Analyse un arrêt avec l'approche fulltext (R-Phase 12) : 1 seul appel LLM."""
+    print(f"\n[{numero}] Analyse fulltext — langue={language}")
+
+    intermediate = load_intermediate(arret_id, client, language=language, pdf_url=pdf_url)
+    if not intermediate:
+        print("  Aucune donnée disponible (extraction requise d'abord).")
+        return False
+
+    try:
+        criteria_all = fetch_criteria(client, language)
+    except Exception:
+        criteria_all = load_criteria_from_file(language)
+
+    if not criteria_all:
+        print(f"  Aucun critère actif pour langue='{language}'.")
+        return False
+
+    criterion_version = criteria_all[0].get("version", "client_excel_v1")
+    procedure_type = intermediate.document.procedure_type
+
+    # Lire la limite de chars depuis l'env (60000 pour Mixtral, 8000 pour Ollama local)
+    max_chars = int(os.environ.get("LLM_MAX_INPUT_CHARS", "60000"))
+
+    system_prompt, user_prompt = build_prompt_fulltext(
+        arret_id=arret_id,
+        language=language,
+        criteria_all=criteria_all,
+        intermediate=intermediate,
+        procedure_type=procedure_type,
+        max_chars=max_chars,
+    )
+
+    valid_ids  = {c["id"] for c in criteria_all}
+    type_by_id = {c["id"]: c.get("expected_value_type") for c in criteria_all}
+    group_schema = build_schema_for_group(list(valid_ids))
+    print(f"  → {len(criteria_all)} critères, {len(intermediate.sections)} sections, "
+          f"max_chars={max_chars}")
+
+    items: list[dict] = []
+    last_response: LLMResponse | None = None
+
+    for attempt in range(MAX_RETRIES + 1):
+        response = provider.complete((system_prompt, user_prompt), json_schema=group_schema)
+        last_response = response
+
+        if response.error and not response.parsed:
+            print(f"    [ERR] Tentative {attempt+1} — LLM error: {response.error}")
+            continue
+        if response.parsed is None:
+            print(f"    [ERR] Tentative {attempt+1} — JSON non parseable")
+            continue
+
+        normalized = normalize_response(
+            response.parsed,
+            arret_id=arret_id,
+            language=language,
+            criterion_version=criterion_version,
+            group="fulltext",
+        )
+        errors = validate_response(normalized, group="fulltext", language=language, valid_ids=valid_ids)
+        if errors:
+            print(f"    [ERR] Tentative {attempt+1} — Validation: {'; '.join(errors)}")
+            continue
+
+        items = normalized.get("items", [])
+        for item in items:
+            item["expected_value_type"] = type_by_id.get(item.get("criterion_id"))
+        if normalized.get("warnings"):
+            print(f"    [WARN] {'; '.join(normalized['warnings'])}")
+        break
+
+    dur_ms = last_response.duration_ms if last_response else 0
+    tok_info = ""
+    if last_response and last_response.prompt_tokens:
+        tok_info = f" | {last_response.prompt_tokens}+{last_response.completion_tokens}tok"
+    print(f"  → {len(items)} items — {dur_ms}ms{tok_info}")
+
+    # Injections regex (identiques au mode 7-groupes)
+    metadata_criteria = [c for c in criteria_all if c.get("llm_group") == "metadata"]
+    items = _inject_regex_metadata(
+        items, metadata_criteria, intermediate, language=language, arret_numero=numero,
+    )
+    if language == "nl":
+        identity_criteria = [c for c in criteria_all if c.get("llm_group") == "identity"]
+        items = _inject_regex_identity_nl(items, identity_criteria, intermediate)
+
+    if dry_run:
+        print("  → dry-run, rien stocké.")
+        for item in items:
+            flag = " ⚠" if item.get("needs_human_review") else ""
+            print(
+                f"    {item['criterion_id']}: {item.get('value')!r} "
+                f"(status={item.get('status')}, conf={item.get('confidence')}, "
+                f"auth={item.get('source_authority')}{flag})"
+            )
+        return True
+
+    model_name = provider.model if hasattr(provider, "model") else "unknown"
+    model_run_id = store_model_run(
+        client,
+        arret_id=arret_id,
+        model=model_name,
+        duration_ms=dur_ms,
+        group="fulltext",
+        status="done" if items else "error",
+        criteria_version=criterion_version,
+        prompt_version=PROMPT_VERSION,
+        prompt_tokens=last_response.prompt_tokens if last_response else None,
+        completion_tokens=last_response.completion_tokens if last_response else None,
+    )
+
+    if items:
+        store_criteria_values(client, arret_id=arret_id, items=items, model_run_id=model_run_id)
+
+    store_processing_job(client, arret_id=arret_id, status="done" if items else "error")
+    print(f"  → Stocké ({len(items)} valeurs, model_run={model_run_id[:8]}...)")
+    return bool(items)
+
+
+# ---------------------------------------------------------------------------
 # Points d'entrée CLI
 # ---------------------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Analyse LLM locale CCE/RVV — R-Phase 2")
-    parser.add_argument("--arret-id", help="UUID d'un arrêt spécifique")
-    parser.add_argument("--group",    help="Analyser uniquement ce groupe LLM (ex: identity)")
-    parser.add_argument("--limit",    type=int, default=3, help="Nb max d'arrêts en batch (défaut: 3)")
+    parser.add_argument("--arret-id",  help="UUID d'un arrêt spécifique")
+    parser.add_argument("--group",     help="Analyser uniquement ce groupe LLM (ex: identity). Ignoré si --fulltext.")
+    parser.add_argument("--limit",     type=int, default=3, help="Nb max d'arrêts en batch (défaut: 3)")
     parser.add_argument("--concurrency", type=int, default=1,
                         help="Nb d'arrêts traités en parallèle (défaut: 1). "
                              "Monter à 16-32 avec un serveur vLLM.")
-    parser.add_argument("--dry-run",  action="store_true", help="Affiche sans écrire en base")
+    parser.add_argument("--dry-run",   action="store_true", help="Affiche sans écrire en base")
+    parser.add_argument("--fulltext",  action="store_true",
+                        help="R-Phase 12 : 1 seul appel LLM, texte complet + tous les critères "
+                             "(Mixtral 8x22B). Ne modifie pas l'ancienne logique 7-groupes.")
     args = parser.parse_args()
 
     client = _get_supabase()
@@ -763,25 +898,47 @@ def main() -> None:
         arret = fetch_arret(client, args.arret_id)
         if not arret:
             sys.exit(f"Arrêt '{args.arret_id}' introuvable.")
-        analyze_arret(
-            arret_id=arret["id"],
-            numero=arret.get("numero", arret["id"]),
-            language=arret["langue"],
-            client=client,
-            provider=provider,
-            dry_run=args.dry_run,
-            target_group=args.group,
-            pdf_url=arret.get("pdf_url", ""),
-        )
+        if args.fulltext:
+            analyze_arret_fulltext(
+                arret_id=arret["id"],
+                numero=arret.get("numero", arret["id"]),
+                language=arret["langue"],
+                client=client,
+                provider=provider,
+                dry_run=args.dry_run,
+                pdf_url=arret.get("pdf_url", ""),
+            )
+        else:
+            analyze_arret(
+                arret_id=arret["id"],
+                numero=arret.get("numero", arret["id"]),
+                language=arret["langue"],
+                client=client,
+                provider=provider,
+                dry_run=args.dry_run,
+                target_group=args.group,
+                pdf_url=arret.get("pdf_url", ""),
+            )
     else:
         arrets = fetch_pending_analyze(client, args.limit)
         if not arrets:
             print("Aucun arrêt prêt pour analyse (statut=termine sans valeurs).")
             return
         print(f"{len(arrets)} arrêt(s) à analyser (limite={args.limit}, "
-              f"concurrence={args.concurrency}, dry_run={args.dry_run})")
+              f"concurrence={args.concurrency}, dry_run={args.dry_run}, "
+              f"fulltext={args.fulltext})")
 
         def _run_one(a: dict, task_client) -> bool:
+            if args.fulltext:
+                return analyze_arret_fulltext(
+                    arret_id=a["id"],
+                    numero=a.get("numero", a["id"]),
+                    language=a["langue"],
+                    client=task_client,
+                    provider=provider,
+                    dry_run=args.dry_run,
+                    pdf_url=a.get("pdf_url", ""),
+                )
             return analyze_arret(
                 arret_id=a["id"],
                 numero=a.get("numero", a["id"]),

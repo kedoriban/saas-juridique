@@ -343,3 +343,122 @@ Produis exactement {len(criteria)} items dans "items", un par criterion_id list�
 Commence ta réponse par {{ :"""
 
     return SYSTEM_PROMPT, user_prompt
+
+
+# ---------------------------------------------------------------------------
+# R-Phase 12 — Full text : UN SEUL appel LLM par arrêt, tout le texte + tous
+# les critères. Approche opposée aux 7 groupes : aucune section cachée au LLM.
+# ---------------------------------------------------------------------------
+
+FULLTEXT_MAX_CHARS = 60000  # limite texte brut envoyé au LLM (Mixtral 8x22B)
+
+
+def build_prompt_fulltext(
+    arret_id: str,
+    language: str,
+    criteria_all: list[dict],
+    intermediate: IntermediateDocument,
+    procedure_type: str = "unknown",
+    max_chars: int = FULLTEXT_MAX_CHARS,
+) -> tuple[str, str]:
+    """
+    Construit un prompt unique avec TOUT le texte de l'arrêt + TOUS les critères.
+    Retourne (system_prompt, user_prompt) pour 1 seul appel LLM par arrêt.
+    """
+    lang_label = "français" if language == "fr" else "néerlandais"
+
+    if procedure_type not in ("protection_internationale_fond", "unknown"):
+        proc_note = (
+            f"\n⚠️ PROCÉDURE NON-DPI ({procedure_type}) : "
+            "cet arrêt ne porte PAS sur une demande de protection internationale. "
+            "Retourner status=\"not_applicable\" pour TOUS les critères liés à l'asile "
+            "(crédibilité, Art. 48/7, agents de persécution/protection, protection subsidiaire, "
+            "statut réfugié, CGRA/CGVS, fuite interne, groupe social, persécutions de genre, "
+            "MGF/VGV, mariage forcé, motivation CGRA, motivation CCE sur le fond DPI, COI). "
+            "Seules les métadonnées (date, numéro, juge, chambre, avocat) et la nationalité "
+            "restent applicables à tous les types d'arrêts."
+        )
+    else:
+        proc_note = ""
+
+    # Concaténer TOUTES les sections dans leur ordre naturel
+    formatted: list[str] = []
+    total_chars = 0
+    for sec in intermediate.sections:
+        text = (sec.text or "").strip()
+        if not text:
+            continue
+        auth = sec.authority or "unknown"
+        sid = sec.section_id or "?"
+        title = f" — {sec.title_detected}" if sec.title_detected else ""
+        chunk = f"[Section: {sid} | Autorité: {auth}{title}]\n{text}"
+        if total_chars + len(chunk) > max_chars:
+            remaining = max_chars - total_chars
+            if remaining > 200:
+                formatted.append(chunk[:remaining] + "\n[… tronqué …]")
+            break
+        formatted.append(chunk)
+        total_chars += len(chunk)
+
+    joined = "\n\n---\n\n".join(formatted) if formatted else "(aucune section disponible)"
+
+    criteria_lines = "\n".join(
+        f'  {i+1}. id="{c["id"]}" | {c["label_original"]} | type={c.get("expected_value_type", "text")}'
+        for i, c in enumerate(criteria_all)
+    )
+    valid_ids_list = ", ".join(f'"{c["id"]}"' for c in criteria_all)
+    n = len(criteria_all)
+
+    ex_found = json.dumps({
+        "criterion_id":       criteria_all[0]["id"] if criteria_all else "id_exemple",
+        "value":              "exemple de valeur extraite",
+        "confidence":         0.85,
+        "evidence_excerpt":   "citation courte copiée du texte (max 150 car.)",
+        "source_authority":   "CCE",
+        "source_section":     "article_48_7",
+        "needs_human_review": False,
+        "status":             "found",
+    }, ensure_ascii=False)
+
+    ex_absent = json.dumps({
+        "criterion_id":       criteria_all[-1]["id"] if len(criteria_all) > 1 else "id_exemple_2",
+        "value":              None,
+        "confidence":         None,
+        "evidence_excerpt":   None,
+        "source_authority":   None,
+        "source_section":     None,
+        "needs_human_review": False,
+        "status":             "not_mentioned",
+    }, ensure_ascii=False)
+
+    user_prompt = f"""Langue du document : {lang_label} ({language})
+Type de procédure : {procedure_type}{proc_note}
+
+## TEXTE INTÉGRAL DE L'ARRÊT ({len(intermediate.sections)} section(s), {total_chars} caractères)
+{joined}
+
+## CRITÈRES À EXTRAIRE ({n} critères)
+{criteria_lines}
+
+## INSTRUCTION CRITIQUE
+Tu dois utiliser UNIQUEMENT ces criterion_id exacts (copie mot pour mot) :
+{valid_ids_list}
+
+⚠️ RÈGLE ABSOLUE : Chaque critère DOIT avoir une entrée dans "items", même si not_applicable \
+ou not_mentioned.
+Un critère sans réponse est une ERREUR. Les critères ont PRESQUE TOUJOURS une valeur dans un arrêt.
+Si un critère semble absent, vérifie à nouveau dans TOUT le texte avant de mettre not_mentioned.
+
+## FORMAT DE RÉPONSE (JSON strict)
+Réponds avec UNIQUEMENT ce JSON — aucun texte avant ou après :
+{{
+  "items": [
+    {ex_found},
+    {ex_absent}
+  ]
+}}
+
+Produis exactement {n} items dans "items", un par criterion_id listé ci-dessus, dans l'ordre.
+Commence ta réponse par {{ :"""
+
+    return SYSTEM_PROMPT, user_prompt
