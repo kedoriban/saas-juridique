@@ -97,20 +97,32 @@ export default async function ValidationPage({ searchParams }: PageProps) {
 
   const arretIds = arretList.map((a) => a.id);
 
-  const { data: values } = await supabase
-    .from("arret_criteria_values")
-    .select("arret_id, validation_status")
-    .in("arret_id", arretIds);
+  // Pagination par pages de 1000 pour contourner le plafond max_rows de PostgREST
+  type ValRow = { arret_id: string; validation_status: string | null };
+  const allValues: ValRow[] = [];
+  const PAGE_SIZE = 1000;
+  let from = 0;
+  while (true) {
+    const { data: page } = await supabase
+      .from("arret_criteria_values")
+      .select("arret_id, validation_status")
+      .in("arret_id", arretIds)
+      .range(from, from + PAGE_SIZE - 1);
+    if (!page?.length) break;
+    allValues.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
 
   const statsMap: Record<string, { total: number; validated: number; correct: number; incorrect: number; incertain: number }> = {};
-  for (const v of values ?? []) {
+  for (const v of allValues) {
     if (!statsMap[v.arret_id]) {
       statsMap[v.arret_id] = { total: 0, validated: 0, correct: 0, incorrect: 0, incertain: 0 };
     }
     statsMap[v.arret_id].total++;
     if (v.validation_status) {
       statsMap[v.arret_id].validated++;
-      if (v.validation_status === "correct") statsMap[v.arret_id].correct++;
+      if (v.validation_status === "correct")   statsMap[v.arret_id].correct++;
       if (v.validation_status === "incorrect") statsMap[v.arret_id].incorrect++;
       if (v.validation_status === "incertain") statsMap[v.arret_id].incertain++;
     }

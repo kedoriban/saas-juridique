@@ -1,11 +1,11 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-09 (R-Phase 14 — 5 gaps decision_reasoning corrigés dans prompts.py. Commit 973527d. Prochaine étape : instance Vast.ai A100 SXM4 80Go + re-analyser 8 arrêts référence + score_reference.py → objectif > 56%.)
+Dernière mise à jour : 2026-06-10 (R-Phase 14 TERMINÉE — batch 50 FR analysés (50/50, avg 47.6 val/arrêt). Instance 40308413 DÉTRUITE. 105 FR analysés / 173 total. Prochaine action : valider qualité sur /validation ou lancer batch 68 FR restants.)
 
 ## Objectifs en cours
 
-1. **Score courant : 216/384 = 56%** (R-Phase 12 terminée, stable). Dernier commit : `973527d`.
-2. **R-Phase 14 EN COURS** : 5 gaps corrigés dans `worker/prompts.py` (commit `973527d`). Instance Vast.ai détruite. **Prochaine action : louer A100 SXM4 80Go + re-analyser les 8 arrêts de référence + score_reference.py → objectif > 56%.**
+1. **Score courant : 220/384 = 57%** (+4 pts vs 56%, R-Phase 14). Dernier commit : `973527d`.
+2. **R-Phase 14 TERMINÉE** (2026-06-10) : batch 50 FR analysés (50/50 succès, avg 47.6 valeurs/arrêt, 0 erreur). Instance 40308413 (A100 SXM4, ~1.04$/h) DÉTRUITE. **État DB : 105 FR avec valeurs / 173 total, 68 FR encore sans valeurs. 23 NL tous analysés.**
 3. **R-Phase 13 TERMINÉE** : instance 40291167 (A100 SXM4, ~1.08$/h) DÉTRUITE. Mistral-Large-2 validé : 48 valeurs/arrêt, ~7-9 min/arrêt, 45-51k tokens/arrêt DPI. **5 gaps prompts identifiés** sur CCE 340332 vs référence client 340356. Corrigés en R-Phase 14.
 4. ~~R-Phase 12~~ — **Terminée** (2026-06-09) : 20 arrêts FR analysés (batch limité à 20). Score 216/384 = 56% confirmé, aucune régression. Instance 40250378 (A100 SXM4, ~1.09 $/h) détruite. Durée : ~16:21→19:10 UTC (~2h49, ~3 $). Améliorations prompts identifiées sur CCE 341854 (fr_013 genre grammatical, fr_018 mère célibataire, fr_006 date intro, fr_007 durée, fr_014 info partielle, fr_043 motivation CCE).
 5. ~~R-Phase 11~~ — **Terminée** (2026-06-09) : 87 nouveaux FR scrapés + extraits. 105 arrêts analysés sur Vast.ai (instance 40125949, A100 SXM4, 1.20 $/h, ~10 $). Score 211→216/384 = 56% (+5 pts). 37 arrêts ont stocké des valeurs sur les 105 traités. 68 FR sans valeurs restants.
@@ -564,8 +564,46 @@ Migration 009 (20 min)
   6. **fr_041 ABSENT** : Protection nationale / fuite interne non extraites.
   7. **Multi-demandeurs** (340356) : limitation architecturale — système 1 requérant par arrêt. Arrêts couples/familles = 1 seul profil capturé. À documenter pour V2.
 - **Fichier référence client 340356** : `C:\Users\kdouc\Downloads\extraction_criteres_fr_arret_340356.md` — extraction manuelle complète par la cliente pour arrêt RvV 340356 (couple kurde irakien, 2 requérants, refus, Erbil). À utiliser comme vérité terrain pour évaluer les améliorations.
+- **R-Phase 14 — Résultats score** (2026-06-09, 22:10 UTC) : 8 arrêts re-analysés (decision_reasoning uniquement). Score **220/384 = 57%** (+4 pts vs 216/384). Par arrêt : 341946=29/48 (60%), 341949=28/48 (58%), 341951=27/48 (56%), 341960=26/48 (54%), 341962=31/48 (64%), 341963=29/48 (60%), 342046=23/48 (47%), 342062=27/48 (56%). Instance 40308413 encore active à fin de session.
+- **R-Phase 14 — instance 40308413** : A100 SXM4 80GB, Massachusetts US, CUDA 12.8 (570.195.03), $1.04/h. SSH : `ssh -p 28412 root@ssh5.vast.ai`. vLLM PID 1627, awq_marlin confirmé, max_model_len=24000. Modèle en cache HF (chargé en ~16s). Durée réelle setup→analyses = ~12 min. À DÉTRUIRE après batch 50.
+- **R-Phase 14 — awq_marlin confirmé** : `--quantization awq_marlin` fonctionne sur cet A100 SXM4 CUDA 12.8. Kernel Marlin actif → plus rapide que awq. KV cache 30,704 tokens (10.31 GiB dispo). Warmup 3.79s.
+- **R-Phase 14 — gaps restants decision_reasoning** : fr_037 (crédibilité) et fr_040 (agents) toujours VIDE sur CCE 341946 DPI accordé. fr_041 (protection nationale) absent. Gains ciblés : 341962 a progressé (31/48=64%), 341949 décision=87% excellent. Prochain axe : fr_037/fr_041 sur arrêts DPI.
 
-## Prochaine action exacte — R-Phase 14 (suite)
+## Prochaine action exacte — R-Phase 14 (FINIR)
+
+**Contexte :** Score 220/384 = 57% validé. Instance 40308413 (ssh5.vast.ai:28412) ENCORE ACTIVE, vLLM PID 1627 opérationnel.
+
+**Étape 1 — Batch 50 arrêts FR sans valeurs**
+```bash
+ssh -p 28412 root@ssh5.vast.ai
+cd /workspace/saas-juridique/worker
+nohup .venv/bin/python analyze.py --limit 50 --lang fr > /workspace/batch50.log 2>&1 &
+echo "Batch PID: $!"
+```
+
+**Étape 2 — Attendre fin du batch (~1h30 pour 50 arrêts × 7 groupes × ~90s)**
+```bash
+tail -f /workspace/batch50.log
+```
+
+**Étape 3 — Détruire l'instance**
+```bash
+vastai destroy instance 40308413
+```
+
+**Étape 4 — Mettre à jour PROJECT_STATE.md + committer**
+```bash
+git add worker/prompts.py PROJECT_STATE.md
+git commit -m "chore: PROJECT_STATE R-Phase 14 terminée — score 57%, batch 50 FR"
+git push
+```
+
+**Étape 5 (optionnel) — Identifier prochains gaps**
+- fr_037 (crédibilité) sur CCE 341946 : encore VIDE
+- fr_041 (protection nationale) absent sur DPI
+- fr_040 (agents) toujours VIDE sur 341946
+
+## Prochaine action exacte — ancienne R-Phase 14 (obsolète — voir ci-dessus)
 
 **Contexte :** `worker/prompts.py` corrigé (commit `973527d`). Instance Vast.ai détruite. Dry-run local non comparatif (qwen3:4b trop petit). Validation = Vast.ai uniquement.
 
