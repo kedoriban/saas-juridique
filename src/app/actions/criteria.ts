@@ -15,6 +15,27 @@ async function requireAdmin() {
   return { supabase, user, error: null };
 }
 
+// Génère un id texte unique (ex. "fr_059_mon_critere") — criteria.id est une PK
+// texte SANS valeur par défaut, il faut donc la fournir à chaque insert.
+async function nextCriterionId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  language: string,
+  slug: string
+): Promise<string> {
+  const { data: rows } = await supabase
+    .from("criteria")
+    .select("id")
+    .eq("language", language);
+  let max = 0;
+  for (const r of (rows ?? []) as { id: string }[]) {
+    const m = /^[a-z]{2}_(\d+)_/.exec(r.id);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  const num = String(max + 1).padStart(3, "0");
+  const safeSlug = (slug || "critere").slice(0, 60);
+  return `${language}_${num}_${safeSlug}`;
+}
+
 // ─── existing action ─────────────────────────────────────────────────────────
 
 export async function toggleCriterion(
@@ -89,8 +110,10 @@ export async function duplicateCriterion(
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = source;
+  const dupId = await nextCriterionId(supabase, source.language, source.slug || "copie");
   const { error: insertError } = await supabase.from("criteria").insert({
     ...rest,
+    id: dupId,
     label_original: `${source.label_original} (copie)`,
     order_index: nextIndex,
     active: false,
@@ -144,9 +167,12 @@ export async function createCriterion(data: {
     .replace(/^_|_$/, "")
     .slice(0, 60);
 
+  const newId = await nextCriterionId(supabase, data.language, slug);
+
   const { data: inserted, error: insertError } = await supabase
     .from("criteria")
     .insert({
+      id: newId,
       criterion_version_id: version.id,
       language: data.language,
       order_index: nextIndex,

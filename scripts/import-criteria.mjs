@@ -33,8 +33,8 @@ async function run() {
   const versions = [
     {
       language: "fr",
-      version_label: "client_excel_v1",
-      source_filename: "Critères analyse(2).xlsx",
+      version_label: "client_excel_v2",
+      source_filename: "Critères analyse_V2.xlsx",
       status: "active",
       activated_at: new Date().toISOString(),
     },
@@ -63,6 +63,18 @@ async function run() {
   }
 
   console.log(`Versions créées/mises à jour : FR=${versionMap["fr"]}, NL=${versionMap["nl"]}`);
+
+  // Archiver l'ancienne version FR v1 (la V2 devient la version FR active)
+  const { error: archiveError } = await supabase
+    .from("criterion_versions")
+    .update({ status: "archived" })
+    .eq("language", "fr")
+    .eq("version_label", "client_excel_v1");
+  if (archiveError) {
+    console.error("Erreur archivage FR v1 :", archiveError.message);
+    process.exit(1);
+  }
+  console.log("Ancienne version FR client_excel_v1 archivée.");
 
   // 2. Insérer les critères (idempotent)
   const criteriaRows = data.criteria.map((c) => ({
