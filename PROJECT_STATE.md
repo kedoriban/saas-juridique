@@ -12,9 +12,17 @@ Dernière mise à jour : 2026-07-26 (Audit validation + **Phase 0 correctifs cri
 
 **Phase 0 livrée (commit `dc9f203`, build/typecheck/lint OK) :** action scindée `setValidationStatus`/`saveValidationNote` (plus de statut null tamponné) ; `ValidationRow` statut non destructif + « ✕ Effacer » + lecture `{error}` + autosave commentaire (debounce 800 ms + flush blur) + garde `beforeunload` ; `(app)/error.tsx` + `global-error.tsx` ; export CSV paginé + BOM UTF-8 + tri `order_index` + helper `src/lib/csv.ts`.
 
-**Phase 0 validée en local (2026-07-26, test utilisateur : statut persistant, autosave commentaire, « ✕ Effacer », export CSV OK).**
+**Phase 0 validée en local puis DÉPLOYÉE en prod** (commit `7c633c6`, dimagin-saasjur.kedo.be).
 
-**Prochaines actions :** `npx vercel --prod` pour déployer le correctif ; puis Phases 1-4 (valeur corrigée structurée, critères V2 FR, prompts, intégration ChatGPT) sur feu vert.
+**Phase 2 (critères V2 FR) LIVRÉE et appliquée en base prod** (commit `f343b61`, 2026-07-26) :
+- Version `client_excel_v2` FR **active**, `client_excel_v1` FR **archivée**, NL reste v1.
+- FR : **58 critères, 57 actifs** (10 nouveaux `fr_049..fr_058` ; 3 scindés = id gardé + nouvel id ; `fr_045` « Lien » désactivé ; libellés/détails/ordre V2 ; nouvelle section PERSECUTIONS). Aucun id renommé.
+- **5988 valeurs `arret_criteria_values` intactes** — les nouveaux critères ne concernent que les futurs arrêts. Worker (DB + `criteria_canonical.json`) lit déjà la V2.
+- Fix `createCriterion` + `duplicateCriterion` (insert sans id → générateur d'id). À déployer au prochain `vercel --prod` pour l'admin.
+- Réversibilité : backup `criteria_canonical.BACKUP.json` (scratchpad) + re-import possible.
+- Décisions : scindés = réutiliser id existant + 1 nouvel id ; Décision = critère EAV seul.
+
+**Prochaine action : Phase 3** — injecter les règles cliente (défaut NON, multi-demandeurs, sous-questions, désinfibulation type III, résumé structuré, citer jurisprudence) + les 49 commentaires de l'avocate dans `worker/prompts.py`, puis re-mesure sur lot de référence. Ensuite Phase 1 (valeur corrigée) et Phase 4 (ChatGPT).
 
 ---
 
