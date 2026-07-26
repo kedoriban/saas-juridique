@@ -40,7 +40,27 @@ export default async function ArretsPage({ searchParams }: PageProps) {
   const nationalite = sp.nationalite?.trim() ?? "";
   const typeDec = sp.type_dec ?? "";
 
+  // Criteria filters — format: "fr_001:belge,fr_005:syrie"
+  const criteriaParam = sp.criteria?.trim() ?? "";
+  const criteriaFilters = criteriaParam
+    .split(",")
+    .map((s) => {
+      const colonIdx = s.indexOf(":");
+      if (colonIdx === -1) return null;
+      const criterionId = s.slice(0, colonIdx).trim();
+      const keyword = s.slice(colonIdx + 1).trim();
+      return criterionId && keyword ? { criterionId, keyword } : null;
+    })
+    .filter((x): x is { criterionId: string; keyword: string } => x !== null);
+
   const supabase = await createClient();
+
+  // Fetch active criteria list for the modal dropdown (parallel with main query)
+  const criteriaListPromise = supabase
+    .from("criteria")
+    .select("id, label_original, language, section_label")
+    .eq("active", true)
+    .order("order_index");
 
   let query = supabase
     .from("arrets")
@@ -56,10 +76,37 @@ export default async function ArretsPage({ searchParams }: PageProps) {
   if (nationalite) query = query.ilike("pays_origine", `%${nationalite}%`);
   if (typeDec) query = query.eq("type_decision", typeDec);
 
-  const { data: arrets, count, error } = await query.range(
-    (page - 1) * perPage,
-    page * perPage - 1
-  );
+  // Criteria filtering: for each (criterion_id, keyword) pair, find arret_ids
+  // with a matching value_text, then AND all results
+  if (criteriaFilters.length > 0) {
+    let matchIds: string[] | null = null;
+    for (const { criterionId, keyword } of criteriaFilters) {
+      const { data: matchData } = await supabase
+        .from("arret_criteria_values")
+        .select("arret_id")
+        .eq("criterion_id", criterionId)
+        .ilike("value_text", `%${keyword}%`);
+
+      const ids = (matchData ?? []).map((r) => r.arret_id as string);
+      if (matchIds === null) {
+        matchIds = ids;
+      } else {
+        const idSet = new Set(ids);
+        matchIds = matchIds.filter((id) => idSet.has(id));
+      }
+    }
+
+    if (matchIds !== null) {
+      query = matchIds.length > 0
+        ? query.in("id", matchIds)
+        : query.in("id", ["00000000-0000-0000-0000-000000000000"]);
+    }
+  }
+
+  const [{ data: arrets, count, error }, { data: criteriaList }] = await Promise.all([
+    query.range((page - 1) * perPage, page * perPage - 1),
+    criteriaListPromise,
+  ]);
 
   const total = count ?? 0;
 
@@ -76,7 +123,7 @@ export default async function ArretsPage({ searchParams }: PageProps) {
 
       {/* Filters — needs Suspense for useSearchParams() */}
       <Suspense fallback={<div className="h-20 animate-pulse bg-gray-100 rounded-xl mb-5" />}>
-        <ArretFilters total={total} />
+        <ArretFilters total={total} criteriaList={criteriaList ?? []} />
       </Suspense>
 
       {error ? (

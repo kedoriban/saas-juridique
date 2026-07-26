@@ -9,7 +9,7 @@ import ValidationRow from "./ValidationRow";
 type PageProps = { params: Promise<{ id: string }> };
 
 type ValueRow = ArretCriteriaValue & {
-  criteria: Pick<Criterion, "label_original" | "section_label" | "language" | "llm_group" | "expected_value_type">;
+  criteria: Pick<Criterion, "label_original" | "section_label" | "language" | "llm_group" | "expected_value_type" | "order_index">;
 };
 
 const LLM_STATUS_BADGE: Record<string, string> = {
@@ -47,11 +47,12 @@ export default async function ValidationDetailPage({ params }: PageProps) {
 
   const { data: values } = await supabase
     .from("arret_criteria_values")
-    .select("*, criteria(label_original, section_label, language, llm_group, expected_value_type)")
+    .select("*, criteria(label_original, section_label, language, llm_group, expected_value_type, order_index)")
     .eq("arret_id", id)
     .order("created_at");
 
-  const rows = (values ?? []) as ValueRow[];
+  const rows = ((values ?? []) as ValueRow[])
+    .sort((a, b) => (a.criteria?.order_index ?? 9999) - (b.criteria?.order_index ?? 9999));
 
   // Stats globales
   const total = rows.length;
@@ -203,7 +204,7 @@ export default async function ValidationDetailPage({ params }: PageProps) {
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">
                 {section}
               </h2>
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-200">
                 {sRows.map((r) => {
                   const displayValue = parseValueText(r.value_text);
                   const llmStatus = deriveLlmStatus(r.value_text, r.value_boolean, r.confidence);
@@ -273,6 +274,7 @@ export default async function ValidationDetailPage({ params }: PageProps) {
                       {/* Zone de validation */}
                       <ValidationRow
                         valueId={r.id}
+                        arretId={id}
                         initialStatus={r.validation_status}
                         initialNote={r.validation_note}
                       />

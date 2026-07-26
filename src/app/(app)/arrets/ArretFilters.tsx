@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { IconSearch, IconFilter } from "@/components/icons";
-import AdvancedSearchModal, { ADVANCED_PARAMS } from "./AdvancedSearchModal";
+import AdvancedSearchModal, { ADVANCED_PARAMS, type CriterionListItem } from "./AdvancedSearchModal";
 
-export default function ArretFilters({ total }: { total: number }) {
+export default function ArretFilters({
+  total,
+  criteriaList = [],
+}: {
+  total: number;
+  criteriaList?: CriterionListItem[];
+}) {
   const sp = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -16,7 +22,28 @@ export default function ArretFilters({ total }: { total: number }) {
   const lang = sp.get("lang") ?? "";
   const dateFrom = sp.get("date_from") ?? "";
   const dateTo = sp.get("date_to") ?? "";
+  const criteriaParam = sp.get("criteria") ?? "";
   const advancedCount = ADVANCED_PARAMS.filter((p) => !!sp.get(p)).length;
+
+  // Save active criteria to sessionStorage; restore on mount if URL has none
+  useEffect(() => {
+    if (criteriaParam) {
+      sessionStorage.setItem("arrets_criteria", criteriaParam);
+    } else {
+      sessionStorage.removeItem("arrets_criteria");
+    }
+  }, [criteriaParam]);
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("arrets_criteria");
+    if (saved && !sp.get("criteria")) {
+      const params = new URLSearchParams(sp.toString());
+      params.set("criteria", saved);
+      params.delete("page");
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // only on mount
 
   function buildUrl(updates: Record<string, string | null>) {
     const params = new URLSearchParams(sp.toString());
@@ -38,9 +65,23 @@ export default function ArretFilters({ total }: { total: number }) {
     nav({ q: inputRef.current?.value.trim() || null });
   }
 
-  const hasFilters = !!(q || lang || dateFrom || dateTo || advancedCount);
+  // Parse criteria param for chips — one chip per criterion filter
+  const parsedCriteriaFilters = criteriaParam
+    .split(",")
+    .map((s) => {
+      const colonIdx = s.indexOf(":");
+      if (colonIdx === -1) return null;
+      const cid = s.slice(0, colonIdx).trim();
+      const kw = s.slice(colonIdx + 1).trim();
+      if (!cid || !kw) return null;
+      const criterion = criteriaList.find((c) => c.id === cid);
+      return { criterionId: cid, keyword: kw, label: criterion?.label_original ?? cid };
+    })
+    .filter((x): x is { criterionId: string; keyword: string; label: string } => x !== null);
 
-  const chips: { id: string; label: string; clear: Record<string, null> }[] = [];
+  const hasFilters = !!(q || lang || dateFrom || dateTo || advancedCount || criteriaParam);
+
+  const chips: { id: string; label: string; clear: Record<string, string | null> }[] = [];
   if (q) chips.push({ id: "q", label: `"${q}"`, clear: { q: null } });
   if (lang) chips.push({ id: "lang", label: lang.toUpperCase(), clear: { lang: null } });
   if (dateFrom || dateTo) {
@@ -48,7 +89,23 @@ export default function ArretFilters({ total }: { total: number }) {
     chips.push({ id: "dates", label, clear: { date_from: null, date_to: null } });
   }
 
-  const clearAdvanced = Object.fromEntries(ADVANCED_PARAMS.map((p) => [p, null as null]));
+  // One chip per criteria filter (can remove individually)
+  for (const cf of parsedCriteriaFilters) {
+    const remaining = parsedCriteriaFilters
+      .filter((f) => f.criterionId !== cf.criterionId)
+      .map((f) => `${f.criterionId}:${f.keyword}`)
+      .join(",");
+    chips.push({
+      id: `cf-${cf.criterionId}`,
+      label: `${cf.label}: "${cf.keyword}"`,
+      clear: { criteria: remaining || null },
+    });
+  }
+
+  const clearAdvanced: Record<string, null> = {
+    ...Object.fromEntries(ADVANCED_PARAMS.map((p) => [p, null as null])),
+    criteria: null,
+  };
 
   return (
     <>
@@ -119,7 +176,7 @@ export default function ArretFilters({ total }: { total: number }) {
           type="button"
           onClick={() => setAdvOpen(true)}
           className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-colors shrink-0 ${
-            advancedCount > 0
+            advancedCount > 0 || criteriaParam
               ? "border-forest-500 text-forest-700 bg-forest-50 hover:bg-forest-100"
               : "border-gray-200 text-gray-600 bg-white hover:bg-gray-50"
           }`}
@@ -163,7 +220,10 @@ export default function ArretFilters({ total }: { total: number }) {
 
         {hasFilters && (
           <button
-            onClick={() => router.push(pathname)}
+            onClick={() => {
+              sessionStorage.removeItem("arrets_criteria");
+              router.push(pathname);
+            }}
             className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
           >
             Réinitialiser
@@ -172,7 +232,11 @@ export default function ArretFilters({ total }: { total: number }) {
       </div>
     </div>
 
-    <AdvancedSearchModal open={advOpen} onClose={() => setAdvOpen(false)} />
+    <AdvancedSearchModal
+      open={advOpen}
+      onClose={() => setAdvOpen(false)}
+      criteriaList={criteriaList}
+    />
     </>
   );
 }

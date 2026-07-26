@@ -27,6 +27,15 @@ interface SectionDef {
   fields: FieldDef[];
 }
 
+export type CriterionListItem = {
+  id: string;
+  label_original: string;
+  language: string;
+  section_label: string;
+};
+
+type CriteriaRow = { uid: string; criterionId: string; keyword: string };
+
 // ── Données statiques ──────────────────────────────────────────────────────────
 
 const TRISTATE: SelectOption[] = [
@@ -50,11 +59,16 @@ const PERSECUTIONS_OPTIONS: SelectOption[] = [
   { value: "groupe_social_genre", label: "Groupe social (genre)" },
 ];
 
+// Params gérés séparément : non comptés dans advancedCount
+const DATE_MODAL_PARAMS = ["date_from", "date_to"];
+
 const SECTIONS: SectionDef[] = [
   {
     id: "procedure",
     label: "Procédure",
     fields: [
+      { param: "date_from", label: "Date arrêt (depuis)", type: "date" },
+      { param: "date_to",   label: "Date arrêt (jusqu'au)", type: "date" },
       { param: "numero", label: "N° arrêt", type: "text", placeholder: "Ex. 342062" },
       { param: "chambre", label: "Chambre", type: "text", placeholder: "Ex. 3e chambre" },
       { param: "juge", label: "Juge", type: "text", placeholder: "Nom du juge" },
@@ -237,13 +251,24 @@ const SECTIONS: SectionDef[] = [
       },
     ],
   },
+  {
+    id: "criteres",
+    label: "Critères",
+    fields: [], // handled dynamically via criteriaRows state
+  },
 ];
 
-export const ADVANCED_PARAMS = SECTIONS.flatMap((s) => s.fields.map((f) => f.param));
+// Advanced params tracked in the advancedCount badge (excludes date modal params + criteria)
+export const ADVANCED_PARAMS = SECTIONS.flatMap((s) => s.fields.map((f) => f.param))
+  .filter((p) => !DATE_MODAL_PARAMS.includes(p));
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function getActiveFilters(draft: Record<string, string>) {
+function getActiveFilters(
+  draft: Record<string, string>,
+  criteriaRows: CriteriaRow[],
+  criteriaList: CriterionListItem[],
+) {
   const active: { param: string; label: string; value: string }[] = [];
   for (const section of SECTIONS) {
     for (const field of section.fields) {
@@ -263,6 +288,16 @@ function getActiveFilters(draft: Record<string, string>) {
       }
       active.push({ param: field.param, label: field.label, value: displayValue });
     }
+  }
+  // Criteria rows
+  for (const row of criteriaRows) {
+    if (!row.criterionId || !row.keyword) continue;
+    const criterion = criteriaList.find((c) => c.id === row.criterionId);
+    active.push({
+      param: `criteria:${row.uid}`,
+      label: criterion?.label_original ?? row.criterionId,
+      value: row.keyword,
+    });
   }
   return active;
 }
@@ -379,20 +414,96 @@ function FieldRenderer({
   );
 }
 
+// ── Criteria section ───────────────────────────────────────────────────────────
+
+function CriteriaSection({
+  criteriaRows,
+  criteriaList,
+  onAdd,
+  onRemove,
+  onUpdate,
+}: {
+  criteriaRows: CriteriaRow[];
+  criteriaList: CriterionListItem[];
+  onAdd: () => void;
+  onRemove: (uid: string) => void;
+  onUpdate: (uid: string, field: "criterionId" | "keyword", value: string) => void;
+}) {
+  const inputCls =
+    "border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 outline-none focus:ring-1 focus:ring-forest-300 bg-white";
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-gray-500">
+        Filtrez les arrêts par valeur extraite pour un critère donné. Plusieurs lignes = logique ET.
+      </p>
+
+      {criteriaRows.length === 0 && (
+        <p className="text-xs text-gray-400 italic py-2">
+          Aucun filtre critère. Cliquez &quot;+ Ajouter un critère&quot; pour commencer.
+        </p>
+      )}
+
+      {criteriaRows.map((row) => (
+        <div key={row.uid} className="flex items-center gap-2">
+          <select
+            value={row.criterionId}
+            onChange={(e) => onUpdate(row.uid, "criterionId", e.target.value)}
+            className={`flex-[2] min-w-0 ${inputCls}`}
+          >
+            <option value="">— Choisir un critère —</option>
+            {criteriaList.map((c) => (
+              <option key={c.id} value={c.id}>
+                [{c.language.toUpperCase()}] {c.label_original}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={row.keyword}
+            onChange={(e) => onUpdate(row.uid, "keyword", e.target.value)}
+            placeholder="Mot-clé…"
+            className={`flex-1 min-w-0 ${inputCls}`}
+          />
+          <button
+            type="button"
+            onClick={() => onRemove(row.uid)}
+            className="text-gray-300 hover:text-red-400 text-xl leading-none shrink-0 transition-colors"
+            aria-label="Supprimer ce filtre"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={onAdd}
+        className="inline-flex items-center gap-1.5 text-xs text-forest-600 hover:text-forest-700 font-medium transition-colors"
+      >
+        <span className="text-base leading-none font-bold">+</span> Ajouter un critère
+      </button>
+    </div>
+  );
+}
+
 // ── Modal ──────────────────────────────────────────────────────────────────────
 
 export default function AdvancedSearchModal({
   open,
   onClose,
+  criteriaList = [],
 }: {
   open: boolean;
   onClose: () => void;
+  criteriaList?: CriterionListItem[];
 }) {
   const sp = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const [activeSection, setActiveSection] = useState(0);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [criteriaRows, setCriteriaRows] = useState<CriteriaRow[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -404,6 +515,23 @@ export default function AdvancedSearchModal({
       })
     );
     setDraft(init);
+
+    // Parse criteria rows from URL param
+    const criteriaParam = sp.get("criteria") ?? "";
+    const rows: CriteriaRow[] = criteriaParam
+      .split(",")
+      .map((s) => {
+        const colonIdx = s.indexOf(":");
+        if (colonIdx === -1) return null;
+        const criterionId = s.slice(0, colonIdx).trim();
+        const keyword = s.slice(colonIdx + 1).trim();
+        return criterionId && keyword
+          ? { uid: crypto.randomUUID(), criterionId, keyword }
+          : null;
+      })
+      .filter((x): x is CriteriaRow => x !== null);
+    setCriteriaRows(rows);
+
     setActiveSection(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -440,12 +568,45 @@ export default function AdvancedSearchModal({
     set(param, current.join(","));
   }
 
+  function addCriteriaRow() {
+    setCriteriaRows((prev) => [
+      ...prev,
+      { uid: crypto.randomUUID(), criterionId: "", keyword: "" },
+    ]);
+  }
+
+  function removeCriteriaRow(uid: string) {
+    setCriteriaRows((prev) => prev.filter((r) => r.uid !== uid));
+  }
+
+  function updateCriteriaRow(uid: string, field: "criterionId" | "keyword", value: string) {
+    setCriteriaRows((prev) =>
+      prev.map((r) => (r.uid === uid ? { ...r, [field]: value } : r))
+    );
+  }
+
   function handleApply() {
     const params = new URLSearchParams(sp.toString());
+
+    // Clear standard advanced params
     ADVANCED_PARAMS.forEach((p) => params.delete(p));
+    // Also clear date modal params
+    DATE_MODAL_PARAMS.forEach((p) => params.delete(p));
+    // Clear criteria
+    params.delete("criteria");
+
+    // Set non-empty draft values
     Object.entries(draft).forEach(([k, v]) => {
       if (v) params.set(k, v);
     });
+
+    // Encode criteria rows
+    const criteriaValue = criteriaRows
+      .filter((r) => r.criterionId && r.keyword)
+      .map((r) => `${r.criterionId}:${r.keyword}`)
+      .join(",");
+    if (criteriaValue) params.set("criteria", criteriaValue);
+
     params.delete("page");
     const qs = params.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname);
@@ -455,18 +616,31 @@ export default function AdvancedSearchModal({
   function handleReset() {
     const params = new URLSearchParams(sp.toString());
     ADVANCED_PARAMS.forEach((p) => params.delete(p));
+    DATE_MODAL_PARAMS.forEach((p) => params.delete(p));
+    params.delete("criteria");
     params.delete("page");
     const qs = params.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname);
     setDraft({});
+    setCriteriaRows([]);
     onClose();
   }
 
-  const activeFilters = getActiveFilters(draft);
+  const activeFilters = getActiveFilters(draft, criteriaRows, criteriaList);
   const section = SECTIONS[activeSection];
 
   function sectionHasFilters(s: SectionDef) {
+    if (s.id === "criteres") return criteriaRows.some((r) => r.criterionId && r.keyword);
     return s.fields.some((f) => !!draft[f.param]);
+  }
+
+  function removeFilter(param: string) {
+    if (param.startsWith("criteria:")) {
+      const uid = param.slice("criteria:".length);
+      setCriteriaRows((prev) => prev.filter((r) => r.uid !== uid));
+    } else {
+      set(param, "");
+    }
   }
 
   return (
@@ -550,18 +724,28 @@ export default function AdvancedSearchModal({
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
               {section.label}
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {section.fields.map((field) => (
-                <div key={field.param} className={field.cols === 2 ? "sm:col-span-2" : ""}>
-                  <FieldRenderer
-                    field={field}
-                    draft={draft}
-                    onSet={set}
-                    onToggleMulti={toggleMulti}
-                  />
-                </div>
-              ))}
-            </div>
+            {section.id === "criteres" ? (
+              <CriteriaSection
+                criteriaRows={criteriaRows}
+                criteriaList={criteriaList}
+                onAdd={addCriteriaRow}
+                onRemove={removeCriteriaRow}
+                onUpdate={updateCriteriaRow}
+              />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {section.fields.map((field) => (
+                  <div key={field.param} className={field.cols === 2 ? "sm:col-span-2" : ""}>
+                    <FieldRenderer
+                      field={field}
+                      draft={draft}
+                      onSet={set}
+                      onToggleMulti={toggleMulti}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Right panel — desktop */}
@@ -584,7 +768,7 @@ export default function AdvancedSearchModal({
                       </div>
                       <button
                         type="button"
-                        onClick={() => set(f.param, "")}
+                        onClick={() => removeFilter(f.param)}
                         className="text-gray-300 hover:text-gray-500 text-base leading-none shrink-0 mt-0.5"
                       >
                         ×

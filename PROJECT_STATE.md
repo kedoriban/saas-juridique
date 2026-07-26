@@ -1,11 +1,29 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-06-10 (R-Phase 14 TERMINÉE — batch 50 FR analysés (50/50, avg 47.6 val/arrêt). Instance 40308413 DÉTRUITE. 105 FR analysés / 173 total. Prochaine action : valider qualité sur /validation ou lancer batch 68 FR restants.)
+Dernière mise à jour : 2026-07-26 (Audit validation + **Phase 0 correctifs critiques LIVRÉE** sur branche `fix/validation-phase0`, commit `dc9f203`. Voir `docs/14-audit-validation-et-plan.md`.)
+
+## Session 2026-07-26 — Audit validation + Phase 0
+
+**Contexte :** retours cliente (validation non satisfaisante, bugs d'encodage/crash, perte de réponses), export CSV réel + V2 de la grille de critères (FR). Audit complet (6 agents) → causes racines identifiées.
+
+**Bugs confirmés :** (1) verdicts avocate jamais enregistrés — `validated_at` tamponné avec `validation_status` null → CSV `statut_validation` 0/1000 alors que commentaire 49 et date 85 remplis ; la copie de travail avait retiré le garde `if(!status)` et `vercel --prod` déploie la copie de travail. (2) Aucun error boundary → « Application error » + perte de page. (3) Export tronqué à 1000 lignes, pas de BOM, tri `created_at`. (4) 49 commentaires cliente = règles à injecter dans `prompts.py`.
+
+**Décisions :** ce round = Phase 0 seule ; ré-analyse V2 = nouveaux + lot de référence ; NL reste V1 (V2 fournie = FR only, ~57 critères).
+
+**Phase 0 livrée (commit `dc9f203`, build/typecheck/lint OK) :** action scindée `setValidationStatus`/`saveValidationNote` (plus de statut null tamponné) ; `ValidationRow` statut non destructif + « ✕ Effacer » + lecture `{error}` + autosave commentaire (debounce 800 ms + flush blur) + garde `beforeunload` ; `(app)/error.tsx` + `global-error.tsx` ; export CSV paginé + BOM UTF-8 + tri `order_index` + helper `src/lib/csv.ts`.
+
+**Phase 0 validée en local (2026-07-26, test utilisateur : statut persistant, autosave commentaire, « ✕ Effacer », export CSV OK).**
+
+**Prochaines actions :** `npx vercel --prod` pour déployer le correctif ; puis Phases 1-4 (valeur corrigée structurée, critères V2 FR, prompts, intégration ChatGPT) sur feu vert.
+
+---
+
 
 ## Objectifs en cours
 
-1. **Score courant : 220/384 = 57%** (+4 pts vs 56%, R-Phase 14). Dernier commit : `973527d`.
-2. **R-Phase 14 TERMINÉE** (2026-06-10) : batch 50 FR analysés (50/50 succès, avg 47.6 valeurs/arrêt, 0 erreur). Instance 40308413 (A100 SXM4, ~1.04$/h) DÉTRUITE. **État DB : 105 FR avec valeurs / 173 total, 68 FR encore sans valeurs. 23 NL tous analysés.**
+1. **UI-Phase — Déploiement Vercel** : `npx vercel --prod` (Tâche 1 + Tâche 2 terminées localement, voir détails ci-dessous).
+2. **Score courant : 220/384 = 57%** (+4 pts vs 56%, R-Phase 14). Dernier commit LLM : `973527d`.
+3. **R-Phase 14 TERMINÉE** (2026-06-10) : batch 50 FR analysés (50/50 succès, avg 47.6 valeurs/arrêt, 0 erreur). Instance 40308413 (A100 SXM4, ~1.04$/h) DÉTRUITE. **État DB : 128 arrêts avec valeurs (105 FR + 23 NL). 68 FR encore sans valeurs (à traiter en prochain batch Vast.ai).**
 3. **R-Phase 13 TERMINÉE** : instance 40291167 (A100 SXM4, ~1.08$/h) DÉTRUITE. Mistral-Large-2 validé : 48 valeurs/arrêt, ~7-9 min/arrêt, 45-51k tokens/arrêt DPI. **5 gaps prompts identifiés** sur CCE 340332 vs référence client 340356. Corrigés en R-Phase 14.
 4. ~~R-Phase 12~~ — **Terminée** (2026-06-09) : 20 arrêts FR analysés (batch limité à 20). Score 216/384 = 56% confirmé, aucune régression. Instance 40250378 (A100 SXM4, ~1.09 $/h) détruite. Durée : ~16:21→19:10 UTC (~2h49, ~3 $). Améliorations prompts identifiées sur CCE 341854 (fr_013 genre grammatical, fr_018 mère célibataire, fr_006 date intro, fr_007 durée, fr_014 info partielle, fr_043 motivation CCE).
 5. ~~R-Phase 11~~ — **Terminée** (2026-06-09) : 87 nouveaux FR scrapés + extraits. 105 arrêts analysés sur Vast.ai (instance 40125949, A100 SXM4, 1.20 $/h, ~10 $). Score 211→216/384 = 56% (+5 pts). 37 arrêts ont stocké des valeurs sur les 105 traités. 68 FR sans valeurs restants.
@@ -569,39 +587,76 @@ Migration 009 (20 min)
 - **R-Phase 14 — awq_marlin confirmé** : `--quantization awq_marlin` fonctionne sur cet A100 SXM4 CUDA 12.8. Kernel Marlin actif → plus rapide que awq. KV cache 30,704 tokens (10.31 GiB dispo). Warmup 3.79s.
 - **R-Phase 14 — gaps restants decision_reasoning** : fr_037 (crédibilité) et fr_040 (agents) toujours VIDE sur CCE 341946 DPI accordé. fr_041 (protection nationale) absent. Gains ciblés : 341962 a progressé (31/48=64%), 341949 décision=87% excellent. Prochain axe : fr_037/fr_041 sur arrêts DPI.
 
-## Prochaine action exacte — R-Phase 14 (FINIR)
+## UI-Phase — Tâches terminées (2026-06-10)
 
-**Contexte :** Score 220/384 = 57% validé. Instance 40308413 (ssh5.vast.ai:28412) ENCORE ACTIVE, vLLM PID 1627 opérationnel.
+### Tâche 1 — Fix UX page validation détail ✅ TERMINÉE
 
-**Étape 1 — Batch 50 arrêts FR sans valeurs**
+**Fichiers modifiés :**
+- `src/app/actions/validation.ts` — signature étendue : `updateValidationStatus(valueId, arretId, status, note)`. Revalidation ciblée `revalidatePath("/validation/${arretId}", "page")` + `"/validation"` (was "layout" → instabilité de l'ordre).
+- `src/app/(app)/validation/[id]/ValidationRow.tsx` — accepte `arretId` prop, passe à l'action. Timeout 2s sur `✓ Enregistré` via `useEffect`. Libellé amélioré : "✓ Enregistré" (plus visible).
+- `src/app/(app)/validation/[id]/page.tsx` — tri stable par `criteria.order_index` (client-side sort après fetch). `order_index` ajouté au select. `divide-y divide-gray-200` (était `divide-gray-50` quasi invisible). `arretId={id}` passé à `ValidationRow`.
+
+**Problèmes résolus :**
+1. Ordre fixe : tri par `order_index` (sémantique, stable) au lieu de `created_at` seul (UUID secondaire non-déterministe lors de batch insert).
+2. Séparateurs visibles : `rgb(229,231,235)` confirmé sur localhost.
+3. Confirmation sauvegarde : "✓ Enregistré" persisté 2s, puis effacé automatiquement.
+
+---
+
+### Tâche 2 — Recherche avancée par critères ✅ TERMINÉE
+
+**Fichiers modifiés :**
+- `src/app/(app)/arrets/page.tsx` — fetch `criteriaList` (critères actifs, parallèle avec la query principale). Parse `?criteria=fr_009_nationalite_du_demandeur:Turquie`. N sous-requêtes Supabase AND (`arret_criteria_values.value_text ILIKE %kw%` par criterion). Si 0 résultats → force `.in("id", ["00000000-..."])`. Passe `criteriaList` à `ArretFilters`.
+- `src/app/(app)/arrets/AdvancedSearchModal.tsx` — section "Critères" dynamique (état `criteriaRows`, bouton "+ Ajouter un critère", dropdown criteria + input mot-clé, bouton ×). `date_from` / `date_to` ajoutés dans section Procédure. `DATE_MODAL_PARAMS` exclut ces champs de `ADVANCED_PARAMS` (pas comptés dans le badge). `handleApply` / `handleReset` gèrent `criteria` param séparément. Export `CriterionListItem` type.
+- `src/app/(app)/arrets/ArretFilters.tsx` — accepte `criteriaList` prop. Parse `criteria` URL param → chips individuels (label depuis DB, ex. "Nationalité du Demandeur: \"Turquie\"×", effaçables individuellement). sessionStorage save/restore au mount. `clearAdvanced` inclut `criteria: null`. Bouton "Réinitialiser" vide aussi sessionStorage.
+
+**Format URL critères :** `?criteria=fr_009_nationalite_du_demandeur:Turquie,fr_010_ethnie:kurde`
+(slug complet `criteria.id`, ex. `fr_009_nationalite_du_demandeur`, pas `fr_009`).
+
+**Tests locaux confirmés :**
+- Server : 200 OK `/arrets`, `/arrets?criteria=fr_009_nationalite_du_demandeur:Turquie`, `/validation/...`
+- Chip "Nationalité du Demandeur: \"Turquie\"×" affiché avec label depuis DB (criteriaList correctement passé)
+- `divide-gray-200` : `rgb(229,231,235)` vérifié
+- Aucune erreur console, aucune erreur serveur, compilation TypeScript propre
+
+**Décisions prises :**
+- `criteria.id` = slug long (`fr_009_nationalite_du_demandeur`), pas `fr_009` — dropdown modal utilise l'id complet.
+- `value_text ILIKE` peut ne pas matcher si le LLM a stocké une forme différente (ex. "turque" vs "Turquie") — comportement attendu pour V1.
+- sessionStorage uniquement pour `criteria` (les autres filtres sont déjà dans l'URL persistante du navigateur).
+- N sous-requêtes Supabase séquentielles (acceptable pour ~128 arrêts en DB, à remplacer par RPC si corpus > 10k arrêts).
+
+**Risques ouverts :**
+- La virgule dans un mot-clé cassera le parsing `?criteria=` (format non-encodé) — limitation V1 documentée, acceptable pour la démo.
+- sessionStorage restore peut créer une redirection inattendue si l'utilisateur navigue explicitement vers `/arrets` sans filtre — à surveiller lors de la démo.
+
+---
+
+## Prochaine action exacte — Déploiement (2026-06-10)
+
 ```bash
-ssh -p 28412 root@ssh5.vast.ai
-cd /workspace/saas-juridique/worker
-nohup .venv/bin/python analyze.py --limit 50 --lang fr > /workspace/batch50.log 2>&1 &
-echo "Batch PID: $!"
+npx vercel --prod
 ```
 
-**Étape 2 — Attendre fin du batch (~1h30 pour 50 arrêts × 7 groupes × ~90s)**
-```bash
-tail -f /workspace/batch50.log
-```
+Alias prod : `dimagin-saasjur.kedo.be`
 
-**Étape 3 — Détruire l'instance**
-```bash
-vastai destroy instance 40308413
-```
+Ensuite (optionnel) : tester sur prod avec un critère réel depuis le modal, ex. ouvrir "Filtres avancés" → section "Critères" → sélectionner "Nationalité du demandeur" → saisir "turque" → lancer.
 
-**Étape 4 — Mettre à jour PROJECT_STATE.md + committer**
-```bash
-git add worker/prompts.py PROJECT_STATE.md
-git commit -m "chore: PROJECT_STATE R-Phase 14 terminée — score 57%, batch 50 FR"
-git push
-```
+**Prompt de reprise recommandé :**
 
-**Étape 5 (optionnel) — Identifier prochains gaps**
-- fr_037 (crédibilité) sur CCE 341946 : encore VIDE
-- fr_041 (protection nationale) absent sur DPI
-- fr_040 (agents) toujours VIDE sur 341946
+```
+Lis CLAUDE.md et PROJECT_STATE.md.
+
+Le déploiement Vercel a été lancé (`npx vercel --prod`).
+URL prod : dimagin-saasjur.kedo.be
+
+Tâches UI terminées et déployées :
+- Fix UX validation détail (ordre stable, séparateurs, ✓ Enregistré 2s)
+- Recherche avancée critères (modal section Critères, URL ?criteria=, chips, sessionStorage)
+
+Prochaine priorité : test démo avec la cliente sur prod. Retours à intégrer ensuite.
+Si bugs remontés : corriger sur main + re-déployer.
+Si OK : planifier la prochaine session R-Phase (68 FR sans valeurs à analyser sur Vast.ai).
+```
 
 ## Prochaine action exacte — ancienne R-Phase 14 (obsolète — voir ci-dessus)
 
