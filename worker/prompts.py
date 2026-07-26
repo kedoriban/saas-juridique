@@ -186,6 +186,32 @@ Genre grammatical (textes FR uniquement — critère "sexe") :
   * Formulations révélatrices : "il a une sœur", "père de famille", "il est parti", "sportif de haut niveau"
 - Utiliser status="inferred" si déduit (pas mentionné explicitement).
 - Exemple : status="inferred", value="Masculin", evidence_excerpt="sportif de haut niveau, il a une sœur supplémentaire"
+
+RÈGLES GRILLE CLIENTE V2 (priorité haute) :
+1. Base légale : sauf mention contraire, les articles cités renvoient à la loi du 15 décembre 1980.
+2. Demandeurs multiples : si l'arrêt vise plusieurs demandeurs (couple ; parent + enfant(s)), réponds à CHAQUE critère POUR CHAQUE demandeur en les distinguant (ex. « Épouse : … / Époux : … »).
+3. Autorité : distingue toujours la position/motivation du CGRA de celle du CCE/RvV. La « Motivation du CCE » est le raisonnement PROPRE du CCE, jamais une copie de la motivation CGRA.
+4. Jurisprudence : quand une jurisprudence/doctrine citée dans l'arrêt fonde ta réponse, cite-la explicitement dans la valeur.
+5. Sous-questions : pour un critère à plusieurs sous-questions (région ET lieu de vie ; mariage forcé ET précoce ; agent de persécution ET de protection), réponds à CHACUNE explicitement.
+
+VALEURS PAR DÉFAUT — l'absence vaut « NON » (EXCEPTION à la règle not_mentioned) :
+Pour les critères ci-dessous, lorsqu'ils sont APPLICABLES (dossier DPI) mais NON explicitement mentionnés, retourne status="found", value="NON", confidence=0.6. Ce n'est pas une invention : c'est la convention de la grille. Sinon, décris l'élément trouvé. Ne retourne JAMAIS not_mentioned pour eux :
+- Procédure accélérée / urgente
+- Demande ultérieure (art. 51/8)
+- Pays d'origine sûr / pays tiers sûr
+- Décision de refus/octroi de statut de réfugié antérieur par UN AUTRE ÉTAT MEMBRE
+- Application de l'art. 48/7
+- Caractère permanent des séquelles
+- Application du bénéfice du doute (art. 48/6 §4)
+
+MGF / mutilations (critères profil) :
+- Type de MGF : préciser de 1 à 4 si connu.
+- Réexcision et Désinfibulation : not_applicable si aucune MGF n'est invoquée. La désinfibulation n'est possible que pour une MGF de type III.
+- Mariage : précoce = avant 18 ans ; préciser lévirat/sororat/polygamie et l'âge du mari si connu.
+
+Décision (type de dispositif) : valeur parmi octroi / refus / renvoi / annulation / irrecevabilité, lue dans le dispositif du CCE/RvV.
+
+Résumé (mots-clés) : 8 à 12 descripteurs séparés par des TIRETS (jusqu'à 15 si complexe), dans l'ordre : matière ; pays ; profil ; type de procédure/décision ; base légale ; persécutions ; motif conventionnel ; vulnérabilité ; preuves déterminantes ; question juridique centrale ; appréciation du CCE ; dispositif.
 """
 
 
@@ -345,31 +371,47 @@ def build_prompt(
             + (f"\n📋 DURÉE PROCÉDURE :{date_ctx} Calculez la durée entre la date d'introduction "
                "et la date de l'arrêt. Exprimez en jours ET en mois approximatifs. "
                "Exemple : '20/03/2025 → 25/02/2026 = 342 jours, environ 11 mois.'")
+            + ("\n📋 fr_008 PROCÉDURE : normale / accélérée / urgente. Si non mentionné → 'normale' (donc NON accélérée).\n"
+               "📋 fr_054 ORALE/ÉCRITE : préciser oral ou écrit, et à l'initiative du Conseil ou du requérant.\n"
+               "📋 fr_055 COMPARUTION : le demandeur a-t-il comparu à l'audience ? Oui / Non.\n"
+               "📋 fr_030 DEMANDE ULTÉRIEURE (art. 51/8) et fr_031 PAYS SÛR : si non mentionnés → value='NON'.")
         )
     elif group == "decision_reasoning" and language == "fr":
         group_note = (
-            "\n📋 PRIORITÉ ABSOLUE — fr_036 DISPOSITIF : La décision finale du CCE (statut accordé, "
-            "recours rejeté, annulation CGRA…) figure dans la section `dispositif` de l'arrêt. "
-            "C'est la DÉCISION DU CCE, pas la position du CGRA. "
-            "Chercher en PREMIER dans la section `dispositif`. "
-            "Exemple : 'Le statut de réfugié est accordé.' ou 'Le recours est rejeté.'\n"
-            "📋 ATTENTION fr_043 — MOTIVATION CCE vs CGRA : fr_043 = la motivation du CCE en propre. "
-            "Si le CCE annule la décision CGRA et accorde le statut → fr_043 doit expliquer POURQUOI "
-            "le CCE accorde (son propre raisonnement). Ne jamais copier la motivation CGRA dans fr_043. "
-            "Exemple : 'Le CCE estime crédible le récit du requérant et accorde le statut de réfugié "
-            "au sens de l'art. 48/3 car [motif CCE].'\n"
+            "\n📋 fr_050 DÉCISION (type de dispositif) : le dispositif du CCE/RvV donne le type de "
+            "décision — octroi (reconnaissance réfugié / protection subsidiaire), refus, renvoi, "
+            "annulation, irrecevabilité. Chercher dans la section `dispositif`. C'est la DÉCISION DU "
+            "CCE, PAS la position du CGRA. Exemple : 'Annulation' ou 'Octroi du statut de réfugié'.\n"
+            "📋 fr_036 — STATUT ANTÉRIEUR AUTRE ÉTAT : ce critère vise UNIQUEMENT une décision de "
+            "refus/octroi de statut de réfugié délivrée AU DEMANDEUR PAR UN AUTRE ÉTAT MEMBRE. Ne pas "
+            "confondre avec la décision du CCE (fr_050). Si non mentionné → value='NON'.\n"
+            "📋 fr_043 — MOTIVATION CCE vs CGRA : fr_043 = la motivation du CCE EN PROPRE. Si le CCE "
+            "annule/accorde → expliquer POURQUOI le CCE le fait (son propre raisonnement), sur le "
+            "statut de réfugié ET/OU la protection subsidiaire. Ne jamais copier la motivation CGRA.\n"
             "📋 fr_037 — CRÉDIBILITÉ : Chercher 'crédibilité' / 'crédible' dans la motivation CCE. "
-            "Extraire si la crédibilité du récit est accordée, rejetée, ou partielle. "
-            "Utiliser status=not_mentioned uniquement si le mot n'apparaît pas du tout.\n"
-            "📋 fr_040 — AGENTS PERSÉCUTION/PROTECTION : 2 sous-questions obligatoires : "
-            "1. Agent de persécution (qui persécute : famille, État, rebelles, groupe armé…) "
-            "2. Agent de protection (autorités locales, ONG, forces de sécurité…). "
-            "Répondre à chaque sous-question même si l'une est non mentionnée.\n"
-            "📋 fr_046 — RÉSUMÉ : Toujours remplir, même si aucun autre critère n'est disponible. "
-            "Format : mots-clés séparés par virgules + résumé 2-3 phrases. "
-            "Exemple : 'DPI, Burundi, statut réfugié accordé, art. 48/3 — Le CCE accorde le statut "
-            "de réfugié à un ressortissant burundais, estimant son récit crédible et retenant la "
-            "persécution étatique comme motif de protection.'"
+            "Indiquer si la crédibilité du récit est accordée, rejetée ou partielle.\n"
+            "📋 fr_056 — BÉNÉFICE DU DOUTE (art. 48/6 §4) : préciser s'il est appliqué ou non. "
+            "Si non mentionné → value='NON'.\n"
+            "📋 fr_040 — AGENTS PERSÉCUTION/PROTECTION : 2 sous-questions : 1. agent de persécution "
+            "2. agent de protection. Distinguer si invoqué par CGRA ou par CCE.\n"
+            "📋 fr_058 — PORTÉE JURIDIQUE : intérêt juridique de l'arrêt (question de principe, "
+            "application d'une jurisprudence CJUE/CEDH…), distinct de fr_044 (arrêt de principe/évolution).\n"
+            "📋 fr_046 — RÉSUMÉ : Toujours remplir. 8 à 12 descripteurs séparés par des TIRETS "
+            "(jusqu'à 15 si complexe), dans l'ordre : matière ; pays ; profil ; procédure/décision ; "
+            "base légale ; persécutions ; motif conventionnel ; vulnérabilité ; preuves ; question "
+            "centrale ; appréciation CCE ; dispositif. Puis 2-3 phrases de résumé.\n"
+            "Exemple : 'DPI – Burundi – femme – plein contentieux – art. 48/3 – persécution étatique "
+            "– opinion politique – récit crédible – reconnaissance. Le CCE accorde le statut de réfugié…'"
+        )
+    elif group == "persecution_claims" and language == "fr":
+        group_note = (
+            "\n📋 fr_032 vs fr_033 : fr_032 = persécutions invoquées HORS genre ; fr_033 = "
+            "persécutions de GENRE (excision, mariage forcé, violences sexuelles/domestiques, "
+            "orientation sexuelle, traite, crimes d'honneur, enrôlement forcé comme enfant-soldat…). "
+            "Ne pas mélanger les deux.\n"
+            "📋 fr_038 ART. 48/7 : si l'article n'est pas expressément visé par l'arrêt → value='NON'.\n"
+            "📋 fr_040 AGENTS : distinguer agent de persécution et agent de protection, et préciser "
+            "si invoqué par CGRA ou par CCE."
         )
 
     user_prompt = f"""Langue du document : {lang_label} ({language})

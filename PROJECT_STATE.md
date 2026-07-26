@@ -22,7 +22,11 @@ Dernière mise à jour : 2026-07-26 (Audit validation + **Phase 0 correctifs cri
 - Réversibilité : backup `criteria_canonical.BACKUP.json` (scratchpad) + re-import possible.
 - Décisions : scindés = réutiliser id existant + 1 nouvel id ; Décision = critère EAV seul.
 
-**Prochaine action : Phase 3** — injecter les règles cliente (défaut NON, multi-demandeurs, sous-questions, désinfibulation type III, résumé structuré, citer jurisprudence) + les 49 commentaires de l'avocate dans `worker/prompts.py`, puis re-mesure sur lot de référence. Ensuite Phase 1 (valeur corrigée) et Phase 4 (ChatGPT).
+**Phase 3a (prompts) LIVRÉE** (2026-07-26) : `worker/prompts.py` enrichi des règles de la grille V2 + des 49 commentaires de l'avocate — bloc « RÈGLES GRILLE CLIENTE V2 » dans `SYSTEM_PROMPT` (défaut « NON » pour 7 critères applicables non mentionnés ; multi-demandeurs ; distinguer CGRA/CCE ; citer la jurisprudence ; sous-questions ; MGF type 1-4 + désinfibulation type III ; résumé 8-15 descripteurs à tirets). **Correction importante** : l'ancien prompt confondait `fr_036` (statut réfugié **antérieur d'un autre État membre**) avec la décision du CCE → séparé, la décision devient `fr_050`. Notes de groupe mises à jour (`decision_reasoning`, `procedure`, nouveau `persecution_claims`) pour les 10 nouveaux critères. Smoke test OK (py_compile + build_prompt). Non déployé sur Vercel (code worker, tourne sur GPU).
+
+**Phase 3b (mesure)** = plus tard, sur feu vert dépense : re-analyser le lot de référence (8-20 arrêts) sur GPU Vast.ai avec les prompts V2 et comparer le score.
+
+**Ensuite** : Phase 1 (valeur corrigée structurée) et Phase 4 (intégration ChatGPT).
 
 ---
 
