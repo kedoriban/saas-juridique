@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { parseValueText } from "@/lib/utils";
+import { buildCsv } from "@/lib/csv";
 
-function escapeCsv(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  const s = String(v).replace(/"/g, '""');
-  return s.includes(",") || s.includes("\n") || s.includes('"') ? `"${s}"` : s;
-}
+const PAGE_SIZE = 1000;
+
+const VALUE_SELECT = `
+  id,
+  value_text,
+  value_boolean,
+  confidence,
+  evidence_excerpt,
+  validation_status,
+  validation_note,
+  validated_at,
+  criteria(label_original, section_label, llm_group, language, order_index)
+`;
 
 export async function GET(
   _req: Request,
@@ -13,6 +23,9 @@ export async function GET(
 ) {
   const { id } = await params;
   const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return new NextResponse("Non authentifié", { status: 401 });
 
   const { data: arret } = await supabase
     .from("arrets")
@@ -22,68 +35,55 @@ export async function GET(
 
   if (!arret) return new NextResponse("Not found", { status: 404 });
 
-  const { data: values } = await supabase
-    .from("arret_criteria_values")
-    .select(`
-      id,
-      value_text,
-      value_boolean,
-      confidence,
-      evidence_excerpt,
-      validation_status,
-      validation_note,
-      validated_at,
-      criteria(label_original, section_label, llm_group, language)
-    `)
-    .eq("arret_id", id)
-    .order("created_at");
+  // Pagination défensive (un arrêt ~96 critères max, mais on reste cohérent
+  // avec l'export global et à l'abri de toute évolution).
+  type ValueRow = Record<string, unknown>;
+  const values: ValueRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("arret_criteria_values")
+      .select(VALUE_SELECT)
+      .eq("arret_id", id)
+      .order("id")
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) return new NextResponse(`Erreur export : ${error.message}`, { status: 500 });
+    if (!data || data.length === 0) break;
+    values.push(...(data as ValueRow[]));
+    if (data.length < PAGE_SIZE) break;
+  }
 
-  const rows = values ?? [];
+  // Tri par order_index de la cliente (comme l'UI de validation).
+  values.sort((ra, rb) => {
+    const oa = ((ra.criteria as Record<string, unknown> | null)?.order_index as number) ?? 9999;
+    const ob = ((rb.criteria as Record<string, unknown> | null)?.order_index as number) ?? 9999;
+    return oa - ob;
+  });
 
   const header = [
-    "arret_numero",
-    "langue_arret",
-    "date_arret",
-    "section",
-    "groupe_llm",
-    "langue_critere",
-    "critere",
-    "valeur_llm",
-    "confidence_pct",
-    "extrait_preuve",
-    "statut_validation",
-    "note",
-    "date_validation",
-  ].join(",");
+    "arret_numero", "langue_arret", "date_arret", "section", "groupe_llm",
+    "langue_critere", "critere", "valeur_llm", "confidence_pct", "extrait_preuve",
+    "statut_validation", "commentaire_avocate", "date_validation",
+  ];
 
-  const lines = rows.map((r: Record<string, unknown>) => {
+  const rows = values.map((r) => {
     const crit = r.criteria as Record<string, unknown> | null;
+    const rawValue = parseValueText(r.value_text as string | null);
     const valeur =
       r.value_boolean !== null && r.value_boolean !== undefined
         ? r.value_boolean ? "oui" : "non"
-        : r.value_text ?? "";
+        : rawValue ?? "";
     const conf =
       r.confidence !== null && r.confidence !== undefined
         ? `${Math.round((r.confidence as number) * 100)}`
         : "";
     return [
-      escapeCsv(arret.numero),
-      escapeCsv(arret.langue),
-      escapeCsv(arret.date_arret),
-      escapeCsv(crit?.section_label),
-      escapeCsv(crit?.llm_group),
-      escapeCsv(crit?.language),
-      escapeCsv(crit?.label_original),
-      escapeCsv(valeur),
-      escapeCsv(conf),
-      escapeCsv(r.evidence_excerpt),
-      escapeCsv(r.validation_status),
-      escapeCsv(r.validation_note),
-      escapeCsv(r.validated_at),
-    ].join(",");
+      arret.numero, arret.langue, arret.date_arret, crit?.section_label, crit?.llm_group,
+      crit?.language, crit?.label_original, valeur, conf, r.evidence_excerpt,
+      r.validation_status, r.validation_note, r.validated_at,
+    ];
   });
 
-  const csv = [header, ...lines].join("\n");
+  const csv = buildCsv(header, rows);
   const filename = `validation_${arret.numero.replace(/\s+/g, "_")}_${arret.date_arret}.csv`;
 
   return new NextResponse(csv, {

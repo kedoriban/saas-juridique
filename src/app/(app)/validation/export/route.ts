@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { parseValueText } from "@/lib/utils";
+import { buildCsv } from "@/lib/csv";
 
-function escapeCsv(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  const s = String(v).replace(/"/g, '""');
-  return s.includes(",") || s.includes("\n") || s.includes('"') ? `"${s}"` : s;
-}
+const PAGE_SIZE = 1000;
+
+const VALUE_SELECT = `
+  arret_id,
+  value_text,
+  value_boolean,
+  confidence,
+  evidence_excerpt,
+  validation_status,
+  validation_note,
+  validated_at,
+  criteria(label_original, section_label, llm_group, language, expected_value_type, order_index)
+`;
 
 export async function GET() {
   const supabase = await createClient();
@@ -14,7 +23,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new NextResponse("Non authentifié", { status: 401 });
 
-  // Récupérer tous les arrêts terminés
+  // Arrêts terminés, dans l'ordre d'affichage (date décroissante).
   const { data: arrets } = await supabase
     .from("arrets")
     .select("id, numero, langue, date_arret, chambre, procedure_type")
@@ -26,51 +35,47 @@ export async function GET() {
   }
 
   const arretIds = arrets.map((a: { id: string }) => a.id);
-
-  // Récupérer toutes les valeurs de critères avec validation
-  const { data: values } = await supabase
-    .from("arret_criteria_values")
-    .select(`
-      arret_id,
-      value_text,
-      value_boolean,
-      confidence,
-      evidence_excerpt,
-      validation_status,
-      validation_note,
-      validated_at,
-      criteria(label_original, section_label, llm_group, language, expected_value_type)
-    `)
-    .in("arret_id", arretIds)
-    .order("arret_id")
-    .order("created_at");
-
-  // Index arrêts
   const arretMap = Object.fromEntries(
-    arrets.map((a: { id: string; numero: string; langue: string; date_arret: string; chambre: string | null; procedure_type: string | null }) => [a.id, a])
-  );
+    arrets.map((a: { id: string }) => [a.id, a])
+  ) as Record<string, { id: string; numero: string; langue: string; date_arret: string; chambre: string | null; procedure_type: string | null }>;
+  const arretPos = Object.fromEntries(arretIds.map((id, i) => [id, i])) as Record<string, number>;
+
+  // Pagination : PostgREST plafonne à max_rows (1000) par requête.
+  // On boucle en .range() jusqu'à épuisement pour ne rien tronquer.
+  type ValueRow = Record<string, unknown>;
+  const values: ValueRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("arret_criteria_values")
+      .select(VALUE_SELECT)
+      .in("arret_id", arretIds)
+      .order("arret_id")
+      .order("id") // ordre stable pour une pagination fiable
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) return new NextResponse(`Erreur export : ${error.message}`, { status: 500 });
+    if (!data || data.length === 0) break;
+    values.push(...(data as ValueRow[]));
+    if (data.length < PAGE_SIZE) break;
+  }
+
+  // Tri final : par arrêt (ordre d'affichage) puis par order_index de la cliente.
+  values.sort((ra, rb) => {
+    const pa = arretPos[ra.arret_id as string] ?? 9999;
+    const pb = arretPos[rb.arret_id as string] ?? 9999;
+    if (pa !== pb) return pa - pb;
+    const oa = ((ra.criteria as Record<string, unknown> | null)?.order_index as number) ?? 9999;
+    const ob = ((rb.criteria as Record<string, unknown> | null)?.order_index as number) ?? 9999;
+    return oa - ob;
+  });
 
   const header = [
-    "arret_numero",
-    "langue_arret",
-    "date_arret",
-    "chambre",
-    "procedure_type",
-    "langue_critere",
-    "section",
-    "groupe_llm",
-    "critere",
-    "type_valeur",
-    "valeur_llm",
-    "confidence_pct",
-    "statut_llm",
-    "extrait_preuve",
-    "statut_validation",
-    "commentaire_avocate",
-    "date_validation",
-  ].join(",");
+    "arret_numero", "langue_arret", "date_arret", "chambre", "procedure_type",
+    "langue_critere", "section", "groupe_llm", "critere", "type_valeur",
+    "valeur_llm", "confidence_pct", "statut_llm", "extrait_preuve",
+    "statut_validation", "commentaire_avocate", "date_validation",
+  ];
 
-  const lines = (values ?? []).map((r: Record<string, unknown>) => {
+  const rows = values.map((r) => {
     const crit = r.criteria as Record<string, unknown> | null;
     const a = arretMap[r.arret_id as string];
 
@@ -90,27 +95,14 @@ export async function GET() {
     const statutLlm = !hasValue ? "non_trouve" : isAmbiguous ? "ambigu" : "extrait";
 
     return [
-      escapeCsv(a?.numero),
-      escapeCsv(a?.langue),
-      escapeCsv(a?.date_arret),
-      escapeCsv(a?.chambre),
-      escapeCsv(a?.procedure_type),
-      escapeCsv(crit?.language),
-      escapeCsv(crit?.section_label),
-      escapeCsv(crit?.llm_group),
-      escapeCsv(crit?.label_original),
-      escapeCsv(crit?.expected_value_type),
-      escapeCsv(valeur),
-      escapeCsv(conf),
-      escapeCsv(statutLlm),
-      escapeCsv(r.evidence_excerpt),
-      escapeCsv(r.validation_status),
-      escapeCsv(r.validation_note),
-      escapeCsv(r.validated_at),
-    ].join(",");
+      a?.numero, a?.langue, a?.date_arret, a?.chambre, a?.procedure_type,
+      crit?.language, crit?.section_label, crit?.llm_group, crit?.label_original,
+      crit?.expected_value_type, valeur, conf, statutLlm, r.evidence_excerpt,
+      r.validation_status, r.validation_note, r.validated_at,
+    ];
   });
 
-  const csv = [header, ...lines].join("\n");
+  const csv = buildCsv(header, rows);
   const today = new Date().toISOString().slice(0, 10);
   const filename = `audit_validation_cce_${today}.csv`;
 
