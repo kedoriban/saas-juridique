@@ -1,6 +1,6 @@
 # PROJECT_STATE.md – État vivant du projet
 
-Dernière mise à jour : 2026-07-26 (Audit validation + **Phase 0 correctifs critiques LIVRÉE** sur branche `fix/validation-phase0`, commit `dc9f203`. Voir `docs/14-audit-validation-et-plan.md`.)
+Dernière mise à jour : 2026-07-26 (Phases 0, 2, 3a, 4a LIVRÉES ; prod à jour, dernier commit `c3057e6`. Reste Phase 4c/4d (ChatGPT), 3b (mesure GPU), 1 (valeur corrigée). Voir `docs/14-audit-validation-et-plan.md`.)
 
 ## Session 2026-07-26 — Audit validation + Phase 0
 
@@ -26,7 +26,18 @@ Dernière mise à jour : 2026-07-26 (Audit validation + **Phase 0 correctifs cri
 
 **Phase 3b (mesure)** = plus tard, sur feu vert dépense : re-analyser le lot de référence (8-20 arrêts) sur GPU Vast.ai avec les prompts V2 et comparer le score.
 
-**Ensuite** : Phase 1 (valeur corrigée structurée) et Phase 4 (intégration ChatGPT).
+**Phase 4a (fondations ChatGPT/OpenAI) LIVRÉE + DÉPLOYÉE** (commits `dfff509`, `c3057e6`) :
+- Migration `011_ai_integration.sql` APPLIQUÉE en prod (tables `app_settings`, `arret_ai_suggestions`, `arret_chat_messages` + RLS ; vérifiées existantes).
+- Clé API OpenAI saisissable dans **Paramètres → Intégration ChatGPT** (admin only ; `kdoucenet@gmail.com` = admin confirmé). Clé stockée dans `app_settings` côté serveur, jamais renvoyée au client. Modèle configurable (défaut gpt-4o).
+- Refactor : 4a utilise le client de session (RLS admin) → **pas besoin de `SUPABASE_SERVICE_ROLE_KEY` dans Vercel pour 4a**. `openaiChatWithKey` (clé explicite, admin) vs `openaiChat` (service-role, pour 4c/4d).
+- **Testé utilisateur** : « Tester la connexion » atteint OpenAI (circuit OK) ; erreur `insufficient_quota` = compte OpenAI sans crédit API (ChatGPT Pro ≠ API), à régler sur platform.openai.com/billing. **Pas un bug code.**
+
+**Phase 4 — RESTE À FAIRE :**
+- **4c** — volet pré-remplissage repliable dans `/validation/[id]` : bouton → appel OpenAI sur `arrets.intermediate_json.sections[].text` (jamais le PDF) → écrit `arret_ai_suggestions` par critère → colonne « ChatGPT » en vis-à-vis du système. À créer : route handler `src/app/api/ai/suggest/route.ts` (l'app n'a AUCUNE route API aujourd'hui) + vérif rôle admin/avocat.
+- **4d** — chat persistant par arrêt : bulle flottante, historique `arret_chat_messages`, reprise après changement de page, streaming. Route `src/app/api/ai/chat/route.ts`.
+- **PRÉREQUIS 4c/4d** : ajouter `SUPABASE_SERVICE_ROLE_KEY` aux variables d'env **Vercel** (Production) — nécessaire car ces appels sont déclenchés par un·e avocat·e (non-admin) qui ne peut pas lire `app_settings` via la RLS. À faire par l'utilisateur (Claude ne saisit pas de secret). Fichiers : provider `src/lib/llm/openai.ts`, client service-role `src/lib/supabase/admin.ts`, helpers `src/lib/settings.ts`.
+
+**Puis** : Phase 1 (valeur corrigée structurée dans la validation + bouton « Adopter » la suggestion ChatGPT).
 
 ---
 
