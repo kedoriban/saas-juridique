@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/actions/auth";
-import { getSetting, maskSecret } from "@/lib/settings";
+import { maskSecret } from "@/lib/settings";
 import { DEFAULT_OPENAI_MODEL } from "@/lib/llm/openai";
 import ApiKeyForm from "./ApiKeyForm";
 
@@ -18,21 +18,21 @@ export default async function ParametresPage() {
 
   const isAdmin = profile?.role === "admin";
 
-  // Lecture de la config IA (service-role) — admin uniquement, tolérante si la
-  // migration/variable Vercel ne sont pas encore en place.
+  // Lecture de la config IA — admin uniquement, via le client de session (RLS admin).
   let ai: { configured: boolean; masked: string | null; model: string } | null = null;
   let aiError: string | null = null;
   if (isAdmin) {
-    try {
-      const [key, model] = await Promise.all([
-        getSetting("openai_api_key"),
-        getSetting("openai_model"),
-      ]);
-      ai = { configured: !!key, masked: maskSecret(key), model: model || DEFAULT_OPENAI_MODEL };
-    } catch {
-      aiError =
-        "Configuration incomplète : appliquez la migration 011 et ajoutez SUPABASE_SERVICE_ROLE_KEY aux variables d'environnement.";
+    const { data, error } = await supabase
+      .from("app_settings")
+      .select("key, value")
+      .in("key", ["openai_api_key", "openai_model"]);
+    if (error) {
+      aiError = "Table app_settings introuvable — appliquez la migration 011 dans Supabase.";
       ai = { configured: false, masked: null, model: DEFAULT_OPENAI_MODEL };
+    } else {
+      const map = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
+      const key = map["openai_api_key"] ?? null;
+      ai = { configured: !!key, masked: maskSecret(key), model: map["openai_model"] || DEFAULT_OPENAI_MODEL };
     }
   }
 
