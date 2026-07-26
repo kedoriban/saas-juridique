@@ -35,7 +35,7 @@ Dernière mise à jour : 2026-07-26 (Phases 0, 2, 3a, 4a LIVRÉES ; prod à jour
 **Phase 4 — RESTE À FAIRE :**
 - **4c** — volet pré-remplissage repliable dans `/validation/[id]` : bouton → appel OpenAI sur `arrets.intermediate_json.sections[].text` (jamais le PDF) → écrit `arret_ai_suggestions` par critère → colonne « ChatGPT » en vis-à-vis du système. À créer : route handler `src/app/api/ai/suggest/route.ts` (l'app n'a AUCUNE route API aujourd'hui) + vérif rôle admin/avocat.
 - **4d** — chat persistant par arrêt : bulle flottante, historique `arret_chat_messages`, reprise après changement de page, streaming. Route `src/app/api/ai/chat/route.ts`.
-- **PRÉREQUIS 4c/4d** : ajouter `SUPABASE_SERVICE_ROLE_KEY` aux variables d'env **Vercel** (Production) — nécessaire car ces appels sont déclenchés par un·e avocat·e (non-admin) qui ne peut pas lire `app_settings` via la RLS. À faire par l'utilisateur (Claude ne saisit pas de secret). Fichiers : provider `src/lib/llm/openai.ts`, client service-role `src/lib/supabase/admin.ts`, helpers `src/lib/settings.ts`.
+- **PRÉREQUIS 4c/4d** : `SUPABASE_SERVICE_ROLE_KEY` **AJOUTÉE aux variables d'env Vercel (Production) le 2026-07-26** ✅ — s'activera au prochain `npx vercel --prod` (les variables Vercel ne sont prises en compte qu'au déploiement suivant). Nécessaire car 4c/4d sont déclenchés par un·e avocat·e (non-admin) qui ne peut pas lire `app_settings` via la RLS ; la clé est lue via le client service-role. Fichiers : provider `src/lib/llm/openai.ts`, client service-role `src/lib/supabase/admin.ts`, helpers `src/lib/settings.ts`.
 
 **Puis** : Phase 1 (valeur corrigée structurée dans la validation + bouton « Adopter » la suggestion ChatGPT).
 
